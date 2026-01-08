@@ -1,0 +1,7 @@
+{
+  "name": "SuccessPolaris",
+  "description": "An elegant educational document sharing platform with a polar aesthetic, featuring secure email-locked downloads and a sophisticated admin dashboard.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
