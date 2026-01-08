@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import AuroraBackground from './components/AuroraBackground';
-import DocumentCard from './components/DocumentCard';
-import AdminDashboard from './components/AdminDashboard';
-import { storageService } from './services/storageService';
-import { Category, Document } from './types';
+import AuroraBackground from './components/AuroraBackground.tsx';
+import DocumentCard from './components/DocumentCard.tsx';
+import AdminDashboard from './components/AdminDashboard.tsx';
+import { storageService } from './services/storageService.ts';
+import { Category, Document } from './types.ts';
 
 const App: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);

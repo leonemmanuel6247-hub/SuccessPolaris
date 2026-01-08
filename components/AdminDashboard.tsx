@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { storageService } from '../services/storageService';
-import { Category, Document, ActivityLog, VisitorActivity } from '../types';
+import { storageService } from '../services/storageService.ts';
+import { Category, Document, ActivityLog, VisitorActivity } from '../types.ts';
 
 const AdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'tree' | 'live' | 'logs'>('tree');

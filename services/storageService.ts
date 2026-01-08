@@ -1,6 +1,6 @@
 
-import { Category, Document, Stats, ActivityLog, VisitorActivity, UserSession } from '../types';
-import { INITIAL_CATEGORIES, INITIAL_DOCUMENTS } from '../constants';
+import { Category, Document, Stats, ActivityLog, VisitorActivity, UserSession } from '../types.ts';
+import { INITIAL_CATEGORIES, INITIAL_DOCUMENTS } from '../constants.ts';
 
 const KEYS = {
   CATEGORIES: 'sp_categories',
