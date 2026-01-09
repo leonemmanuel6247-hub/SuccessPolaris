@@ -14,26 +14,23 @@ root.render(
   </React.StrictMode>
 );
 
-// Logic to hide the loader once the script is executed and React is mounting
-window.addEventListener('load', () => {
+// Cette fonction assure que le loader disparaît dès que le script a fini de monter l'App
+const removeLoader = () => {
     const loader = document.getElementById('loader');
     if (loader) {
-        setTimeout(() => {
-            loader.style.opacity = '0';
-            setTimeout(() => {
-                loader.style.display = 'none';
-            }, 500);
-        }, 800);
-    }
-});
-
-// Fallback removal
-setTimeout(() => {
-    const loader = document.getElementById('loader');
-    if (loader && loader.style.display !== 'none') {
         loader.style.opacity = '0';
         setTimeout(() => {
             loader.style.display = 'none';
-        }, 500);
+        }, 800);
     }
-}, 3000);
+};
+
+// Exécution de la suppression après un court délai pour assurer une transition fluide
+if (document.readyState === 'complete') {
+    removeLoader();
+} else {
+    window.addEventListener('load', removeLoader);
+}
+
+// Sécurité : suppression forcée après 4 secondes si le script est bloqué par autre chose
+setTimeout(removeLoader, 4000);

@@ -38,41 +38,45 @@
             min-height: 100vh;
         }
         
-        /* Loader styles based on technical analysis */
+        /* Styles du Loader Polaris */
         #loader {
             position: fixed;
-            inset: 0;
-            background: #020617;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #020617;
             display: flex;
             justify-content: center;
             align-items: center;
             z-index: 9999;
-            transition: opacity 0.5s ease-out;
+            transition: opacity 0.8s ease-in-out;
         }
         .loader-content {
             text-align: center;
-            width: 100%;
-            max-width: 300px;
+            width: 80%;
+            max-width: 400px;
         }
         .polaris-logo {
-            font-size: 3rem;
+            font-size: 3.5rem;
             color: #00d4ff;
             margin-bottom: 1.5rem;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 10px;
+            gap: 15px;
         }
         .polaris-logo span {
             font-weight: 900;
-            color: white;
+            color: #fff;
+            letter-spacing: -2px;
         }
         #loader h1 {
-            font-size: 0.75rem;
-            letter-spacing: 0.5em;
+            color: #fff;
+            font-size: 0.8rem;
+            letter-spacing: 0.6em;
             font-weight: 900;
-            color: white;
-            margin-bottom: 2rem;
+            margin-bottom: 2.5rem;
             text-transform: uppercase;
         }
         .loading-bar {
@@ -81,17 +85,19 @@
             background: rgba(255, 255, 255, 0.05);
             border-radius: 10px;
             overflow: hidden;
+            position: relative;
         }
         .loading-progress {
             width: 40%;
             height: 100%;
             background: #00d4ff;
-            box-shadow: 0 0 15px #00d4ff;
-            animation: loading 2s infinite ease-in-out;
+            box-shadow: 0 0 20px #00d4ff;
+            position: absolute;
+            animation: loading-anim 2s infinite ease-in-out;
         }
-        @keyframes loading {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(250%); }
+        @keyframes loading-anim {
+            0% { left: -40%; }
+            100% { left: 140%; }
         }
 
         ::-webkit-scrollbar {
