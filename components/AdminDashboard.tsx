@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { storageService } from '../services/storageService.ts';
 import { Category, Document, VisitorActivity, AdminAccount } from '../types.ts';
@@ -216,7 +215,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRefresh }) => {
                  <h3 className="text-2xl md:text-3xl font-black text-white uppercase italic tracking-tighter mb-4 md:mb-6">Publication Drive</h3>
                  <p className="text-[11px] md:text-[13px] text-white/40 uppercase font-bold leading-relaxed tracking-widest md:tracking-[0.25em]">
                    Le canal Google Drive est l'unique vecteur de publication autorisé. <br/>
-                   Séparez les catégories par <span className="text-cyan-400">">"</span> pour créer l'arborescence récursivement.
+                   Séparez les catégories par <span className="text-cyan-400">"{'&gt;'}"</span> pour créer l'arborescence récursivement.
                  </p>
                </div>
                <button onClick={() => window.open('https://drive.google.com', '_blank')} className="w-full xl:w-auto bg-white text-slate-950 px-10 md:px-14 py-5 md:py-7 rounded-[1.5rem] md:rounded-[2rem] text-[11px] md:text-[12px] font-black uppercase tracking-widest md:tracking-[0.25em] hover:bg-cyan-400 transition-all shadow-2xl shrink-0">
