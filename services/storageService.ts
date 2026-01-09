@@ -1,5 +1,4 @@
-
-import { Category, Document, Stats, ActivityLog, AdminAccount, VisitorActivity } from '../types.ts';
+import { Category, Document, AdminAccount, VisitorActivity } from '../types.ts';
 import { INITIAL_CATEGORIES, INITIAL_DOCUMENTS } from '../constants.ts';
 
 const KEYS = {
@@ -9,6 +8,32 @@ const KEYS = {
   LOGS: 'sp_logs',
   VISITOR_ACTIVITY: 'sp_visitor_spy_logs',
   ACCOUNTS: 'sp_admin_accounts'
+};
+
+const safeGetItem = (key: string): string | null => {
+  try {
+    return localStorage.getItem(key);
+  } catch (e) {
+    console.warn("LocalStorage access denied or unavailable", e);
+    return null;
+  }
+};
+
+const safeSetItem = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+    console.error("Failed to save to LocalStorage", e);
+  }
+};
+
+const parseJson = <T>(data: string | null, fallback: T): T => {
+  if (!data) return fallback;
+  try {
+    return JSON.parse(data) as T;
+  } catch (e) {
+    return fallback;
+  }
 };
 
 export const storageService = {
@@ -25,13 +50,13 @@ export const storageService = {
 
   // --- ACCOUNTS ---
   getAccounts: (): AdminAccount[] => {
-    const data = localStorage.getItem(KEYS.ACCOUNTS);
+    const data = safeGetItem(KEYS.ACCOUNTS);
     if (!data) {
-      const master = [{ id: '1', username: 'Léon', role: 'MASTER', lastLogin: new Date().toLocaleString() }];
-      localStorage.setItem(KEYS.ACCOUNTS, JSON.stringify(master));
-      return master as AdminAccount[];
+      const master: AdminAccount[] = [{ id: '1', username: 'Léon', role: 'MASTER', lastLogin: new Date().toLocaleString() }];
+      safeSetItem(KEYS.ACCOUNTS, JSON.stringify(master));
+      return master;
     }
-    return JSON.parse(data);
+    return parseJson<AdminAccount[]>(data, []);
   },
 
   addAccount: (username: string) => {
@@ -42,33 +67,33 @@ export const storageService = {
       role: 'EDITOR',
       lastLogin: 'Jamais'
     };
-    localStorage.setItem(KEYS.ACCOUNTS, JSON.stringify([...accounts, newAcc]));
+    safeSetItem(KEYS.ACCOUNTS, JSON.stringify([...accounts, newAcc]));
     storageService.addLog('ACCOUNT', `Nouveau compte créé : ${username}`);
   },
 
   deleteAccount: (id: string) => {
     const accounts = storageService.getAccounts().filter(a => a.id !== id);
-    localStorage.setItem(KEYS.ACCOUNTS, JSON.stringify(accounts));
+    safeSetItem(KEYS.ACCOUNTS, JSON.stringify(accounts));
   },
 
   // --- CATEGORIES ---
   getCategories: (): Category[] => {
-    const data = localStorage.getItem(KEYS.CATEGORIES);
+    const data = safeGetItem(KEYS.CATEGORIES);
     if (!data) {
-      localStorage.setItem(KEYS.CATEGORIES, JSON.stringify(INITIAL_CATEGORIES));
+      safeSetItem(KEYS.CATEGORIES, JSON.stringify(INITIAL_CATEGORIES));
       return INITIAL_CATEGORIES;
     }
-    return JSON.parse(data);
+    return parseJson<Category[]>(data, INITIAL_CATEGORIES);
   },
 
   saveCategory: (name: string, parentId: string | null): Category => {
     const cats = storageService.getCategories();
-    const newCat = { 
+    const newCat: Category = { 
       id: `cat-${Date.now()}-${Math.floor(Math.random() * 1000000)}`, 
       name: name.trim(), 
       parentId 
     };
-    localStorage.setItem(KEYS.CATEGORIES, JSON.stringify([...cats, newCat]));
+    safeSetItem(KEYS.CATEGORIES, JSON.stringify([...cats, newCat]));
     storageService.addLog('SYSTEM', `Node créé : ${name}`);
     return newCat;
   },
@@ -98,11 +123,9 @@ export const storageService = {
   },
 
   deleteCategory: (id: string) => {
-    // Suppression récursive (simplifiée ici en filtrant tout ce qui a cet ID comme parent)
     const allCats = storageService.getCategories();
     const toDelete = new Set([id]);
     
-    // On trouve tous les descendants
     let foundNew = true;
     while(foundNew) {
       foundNew = false;
@@ -117,15 +140,15 @@ export const storageService = {
     const filteredCats = allCats.filter(c => !toDelete.has(c.id));
     const filteredDocs = storageService.getDocuments().filter(d => !toDelete.has(d.categoryId));
     
-    localStorage.setItem(KEYS.CATEGORIES, JSON.stringify(filteredCats));
-    localStorage.setItem(KEYS.DOCUMENTS, JSON.stringify(filteredDocs));
+    safeSetItem(KEYS.CATEGORIES, JSON.stringify(filteredCats));
+    safeSetItem(KEYS.DOCUMENTS, JSON.stringify(filteredDocs));
     storageService.addLog('DELETE', `Suppression de ${toDelete.size} sections`);
   },
 
   // --- DOCUMENTS ---
   getDocuments: (): Document[] => {
-    const data = localStorage.getItem(KEYS.DOCUMENTS);
-    return data ? JSON.parse(data) : INITIAL_DOCUMENTS;
+    const data = safeGetItem(KEYS.DOCUMENTS);
+    return parseJson<Document[]>(data, INITIAL_DOCUMENTS);
   },
 
   addDocument: async (docData: Omit<Document, 'id' | 'downloads' | 'dateAdded'>) => {
@@ -139,7 +162,7 @@ export const storageService = {
       downloads: 0,
       dateAdded: new Date().toISOString()
     };
-    localStorage.setItem(KEYS.DOCUMENTS, JSON.stringify([newDoc, ...docs]));
+    safeSetItem(KEYS.DOCUMENTS, JSON.stringify([newDoc, ...docs]));
     storageService.addLog('UPLOAD', `Publication Drive : ${docData.title}`);
   },
 
@@ -148,28 +171,35 @@ export const storageService = {
     const docIndex = docs.findIndex(d => d.id === id);
     if (docIndex > -1) {
       docs[docIndex].downloads += 1;
-      localStorage.setItem(KEYS.DOCUMENTS, JSON.stringify(docs));
+      safeSetItem(KEYS.DOCUMENTS, JSON.stringify(docs));
     }
   },
 
   // --- LOGS & STATS ---
   logVisit: () => {
-    const data = localStorage.getItem(KEYS.STATS);
-    const s = data ? JSON.parse(data) : { totalVisits: 0, totalDownloads: 0 };
-    localStorage.setItem(KEYS.STATS, JSON.stringify({ ...s, totalVisits: (s.totalVisits || 0) + 1 }));
+    const data = safeGetItem(KEYS.STATS);
+    const s = parseJson<{totalVisits: number, totalDownloads: number}>(data, { totalVisits: 0, totalDownloads: 0 });
+    safeSetItem(KEYS.STATS, JSON.stringify({ ...s, totalVisits: (s.totalVisits || 0) + 1 }));
   },
 
   logDownload: (email: string, fileName: string) => {
-    const activities = JSON.parse(localStorage.getItem(KEYS.VISITOR_ACTIVITY) || '[]');
-    const newAct = { id: `d-${Date.now()}`, type: 'DOWNLOAD', email, fileName, timestamp: new Date().toLocaleString() };
-    localStorage.setItem(KEYS.VISITOR_ACTIVITY, JSON.stringify([newAct, ...activities].slice(0, 500)));
+    const data = safeGetItem(KEYS.VISITOR_ACTIVITY);
+    const activities = parseJson<VisitorActivity[]>(data, []);
+    const newAct: VisitorActivity = { id: `d-${Date.now()}`, type: 'DOWNLOAD', email, fileName, timestamp: new Date().toLocaleString() };
+    safeSetItem(KEYS.VISITOR_ACTIVITY, JSON.stringify([newAct, ...activities].slice(0, 500)));
   },
 
-  getVisitorActivities: () => JSON.parse(localStorage.getItem(KEYS.VISITOR_ACTIVITY) || '[]'),
-  getLogs: () => JSON.parse(localStorage.getItem(KEYS.LOGS) || '[]'),
+  getVisitorActivities: (): VisitorActivity[] => {
+    return parseJson<VisitorActivity[]>(safeGetItem(KEYS.VISITOR_ACTIVITY), []);
+  },
+
+  getLogs: (): any[] => {
+    return parseJson<any[]>(safeGetItem(KEYS.LOGS), []);
+  },
+
   addLog: (action: any, details: string) => {
     const logs = storageService.getLogs();
     const newLog = { id: Date.now().toString(), action, details, timestamp: new Date().toLocaleString() };
-    localStorage.setItem(KEYS.LOGS, JSON.stringify([newLog, ...logs].slice(0, 100)));
+    safeSetItem(KEYS.LOGS, JSON.stringify([newLog, ...logs].slice(0, 100)));
   }
 };
