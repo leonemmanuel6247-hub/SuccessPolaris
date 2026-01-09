@@ -3,6 +3,21 @@ export interface Category {
   id: string;
   name: string;
   parentId: string | null;
+  icon?: string;
+}
+
+export interface AdminAccount {
+  id: string;
+  username: string;
+  role: 'MASTER' | 'EDITOR';
+  lastLogin: string;
+}
+
+export interface CloudConfig {
+  driveFolderId: string;
+  apiKey: string;
+  isConnected: boolean;
+  lastSync: string;
 }
 
 export interface Document {
@@ -10,32 +25,31 @@ export interface Document {
   title: string;
   description: string;
   categoryId: string;
-  githubUrl: string; // Utilisé comme URL externe ou ID de référence locale
+  fileUrl: string; 
+  fileType: 'pdf' | 'docx' | 'image' | 'archive';
+  tags: string[];
   downloads: number;
   dateAdded: string;
-  isLocal?: boolean; // Flag pour le stockage IndexedDB
+  size?: string;
 }
 
 export interface VisitorActivity {
   id: string;
-  path: string;
+  type: 'VISIT' | 'DOWNLOAD';
+  email?: string;
+  fileName?: string;
   timestamp: string;
 }
 
 export interface Stats {
   totalVisits: number;
   totalDownloads: number;
-}
-
-export interface UserSession {
-  email: string;
-  country?: string;
-  isValidated: boolean;
+  mostViewedCategory?: string;
 }
 
 export interface ActivityLog {
   id: string;
-  action: string;
+  action: 'AUTH' | 'SYSTEM' | 'UPLOAD' | 'DELETE' | 'CONFIG' | 'TRAÇAGE' | 'ACCOUNT';
   timestamp: string;
   details: string;
 }

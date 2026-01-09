@@ -1,5 +1,5 @@
 
-import { Category, Document, Stats, ActivityLog, VisitorActivity, UserSession } from '../types.ts';
+import { Category, Document, Stats, ActivityLog, AdminAccount, VisitorActivity } from '../types.ts';
 import { INITIAL_CATEGORIES, INITIAL_DOCUMENTS } from '../constants.ts';
 
 const KEYS = {
@@ -7,115 +7,140 @@ const KEYS = {
   DOCUMENTS: 'sp_documents',
   STATS: 'sp_stats',
   LOGS: 'sp_logs',
-  USER: 'sp_user_session',
-  LAST_DOC_COUNT: 'sp_last_count',
-  ACTIVITY: 'sp_visitor_activity'
+  VISITOR_ACTIVITY: 'sp_visitor_spy_logs',
+  ACCOUNTS: 'sp_admin_accounts'
 };
 
-// Initialisation de IndexedDB pour les fichiers volumineux
-const dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
-  const request = indexedDB.open('SuccessPolarisDB', 1);
-  request.onupgradeneeded = () => {
-    if (!request.result.objectStoreNames.contains('files')) {
-      request.result.createObjectStore('files');
-    }
-  };
-  request.onsuccess = () => resolve(request.result);
-  request.onerror = () => reject(request.error);
-});
-
 export const storageService = {
-  // Gestion des fichiers binaires (IndexedDB)
-  saveFileBinary: async (id: string, file: File): Promise<void> => {
-    const db = await dbPromise;
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction('files', 'readwrite');
-      tx.objectStore('files').put(file, id);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
+  optimizeDriveUrl: (url: string): string => {
+    if (url.includes('drive.google.com')) {
+      const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      const id = idMatch ? idMatch[1] : null;
+      if (id) {
+        return `https://drive.google.com/uc?export=download&id=${id}`;
+      }
+    }
+    return url;
   },
 
-  getFileBinary: async (id: string): Promise<Blob | null> => {
-    const db = await dbPromise;
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction('files', 'readonly');
-      const request = tx.objectStore('files').get(id);
-      request.onsuccess = () => resolve(request.result || null);
-      request.onerror = () => reject(request.error);
-    });
+  // --- ACCOUNTS ---
+  getAccounts: (): AdminAccount[] => {
+    const data = localStorage.getItem(KEYS.ACCOUNTS);
+    if (!data) {
+      const master = [{ id: '1', username: 'Léon', role: 'MASTER', lastLogin: new Date().toLocaleString() }];
+      localStorage.setItem(KEYS.ACCOUNTS, JSON.stringify(master));
+      return master as AdminAccount[];
+    }
+    return JSON.parse(data);
   },
 
-  deleteFileBinary: async (id: string): Promise<void> => {
-    const db = await dbPromise;
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction('files', 'readwrite');
-      tx.objectStore('files').delete(id);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
+  addAccount: (username: string) => {
+    const accounts = storageService.getAccounts();
+    const newAcc: AdminAccount = {
+      id: `acc-${Date.now()}`,
+      username,
+      role: 'EDITOR',
+      lastLogin: 'Jamais'
+    };
+    localStorage.setItem(KEYS.ACCOUNTS, JSON.stringify([...accounts, newAcc]));
+    storageService.addLog('ACCOUNT', `Nouveau compte créé : ${username}`);
   },
 
-  // Categories
+  deleteAccount: (id: string) => {
+    const accounts = storageService.getAccounts().filter(a => a.id !== id);
+    localStorage.setItem(KEYS.ACCOUNTS, JSON.stringify(accounts));
+  },
+
+  // --- CATEGORIES ---
   getCategories: (): Category[] => {
     const data = localStorage.getItem(KEYS.CATEGORIES);
-    return data ? JSON.parse(data) : INITIAL_CATEGORIES;
+    if (!data) {
+      localStorage.setItem(KEYS.CATEGORIES, JSON.stringify(INITIAL_CATEGORIES));
+      return INITIAL_CATEGORIES;
+    }
+    return JSON.parse(data);
   },
-  saveCategory: (name: string, parentId: string | null) => {
+
+  saveCategory: (name: string, parentId: string | null): Category => {
     const cats = storageService.getCategories();
-    const newCat = { id: `cat-${Date.now()}`, name, parentId };
-    storageService.saveCategories([...cats, newCat]);
-    storageService.addLog('Architecture', `Nouvelle catégorie créée : ${name}`);
+    const newCat = { 
+      id: `cat-${Date.now()}-${Math.floor(Math.random() * 1000000)}`, 
+      name: name.trim(), 
+      parentId 
+    };
+    localStorage.setItem(KEYS.CATEGORIES, JSON.stringify([...cats, newCat]));
+    storageService.addLog('SYSTEM', `Node créé : ${name}`);
     return newCat;
   },
-  saveCategories: (cats: Category[]) => {
-    localStorage.setItem(KEYS.CATEGORIES, JSON.stringify(cats));
+
+  ensureCategoryPath: (path: string): string => {
+    const parts = path.split('>').map(p => p.trim()).filter(p => p !== "");
+    let currentParentId: string | null = null;
+    let lastId = "";
+
+    for (const part of parts) {
+      const cats = storageService.getCategories();
+      const existing = cats.find(c => 
+        c.name.toLowerCase() === part.toLowerCase() && 
+        c.parentId === currentParentId
+      );
+
+      if (existing) {
+        currentParentId = existing.id;
+        lastId = existing.id;
+      } else {
+        const newCat = storageService.saveCategory(part, currentParentId);
+        currentParentId = newCat.id;
+        lastId = newCat.id;
+      }
+    }
+    return lastId;
   },
+
   deleteCategory: (id: string) => {
-    const cats = storageService.getCategories().filter(c => c.id !== id);
-    const docs = storageService.getDocuments().filter(d => d.categoryId === id);
+    // Suppression récursive (simplifiée ici en filtrant tout ce qui a cet ID comme parent)
+    const allCats = storageService.getCategories();
+    const toDelete = new Set([id]);
     
-    docs.forEach(doc => {
-      if (doc.isLocal) storageService.deleteFileBinary(doc.githubUrl);
-    });
+    // On trouve tous les descendants
+    let foundNew = true;
+    while(foundNew) {
+      foundNew = false;
+      allCats.forEach(c => {
+        if(c.parentId && toDelete.has(c.parentId) && !toDelete.has(c.id)) {
+          toDelete.add(c.id);
+          foundNew = true;
+        }
+      });
+    }
 
-    const remainingDocs = storageService.getDocuments().filter(d => d.categoryId !== id);
-    storageService.saveCategories(cats);
-    storageService.saveDocuments(remainingDocs);
-    storageService.addLog('Architecture', `Suppression de l'entrée d'index ${id}`);
+    const filteredCats = allCats.filter(c => !toDelete.has(c.id));
+    const filteredDocs = storageService.getDocuments().filter(d => !toDelete.has(d.categoryId));
+    
+    localStorage.setItem(KEYS.CATEGORIES, JSON.stringify(filteredCats));
+    localStorage.setItem(KEYS.DOCUMENTS, JSON.stringify(filteredDocs));
+    storageService.addLog('DELETE', `Suppression de ${toDelete.size} sections`);
   },
 
-  // Documents
+  // --- DOCUMENTS ---
   getDocuments: (): Document[] => {
     const data = localStorage.getItem(KEYS.DOCUMENTS);
     return data ? JSON.parse(data) : INITIAL_DOCUMENTS;
   },
-  saveDocuments: (docs: Document[]) => {
-    localStorage.setItem(KEYS.DOCUMENTS, JSON.stringify(docs));
-  },
-  addDocument: async (docData: Omit<Document, 'id' | 'downloads' | 'dateAdded'>, file?: File) => {
+
+  addDocument: async (docData: Omit<Document, 'id' | 'downloads' | 'dateAdded'>) => {
     const docs = storageService.getDocuments();
-    const id = `doc-${Date.now()}`;
-    let githubUrl = docData.githubUrl;
-    let isLocal = false;
-
-    if (file) {
-      const fileId = `file-${Date.now()}`;
-      await storageService.saveFileBinary(fileId, file);
-      githubUrl = fileId;
-      isLocal = true;
-    }
-
+    const optimizedUrl = storageService.optimizeDriveUrl(docData.fileUrl);
+    
     const newDoc: Document = {
       ...docData,
-      id,
-      githubUrl,
-      isLocal,
+      fileUrl: optimizedUrl,
+      id: `doc-${Date.now()}`,
       downloads: 0,
       dateAdded: new Date().toISOString()
     };
-    storageService.saveDocuments([newDoc, ...docs]);
-    storageService.addLog('Publication', `Indexation du document : ${docData.title}`);
+    localStorage.setItem(KEYS.DOCUMENTS, JSON.stringify([newDoc, ...docs]));
+    storageService.addLog('UPLOAD', `Publication Drive : ${docData.title}`);
   },
 
   incrementDownload: (id: string) => {
@@ -123,62 +148,28 @@ export const storageService = {
     const docIndex = docs.findIndex(d => d.id === id);
     if (docIndex > -1) {
       docs[docIndex].downloads += 1;
-      storageService.saveDocuments(docs);
-      storageService.updateStats(0, 1);
-      storageService.addLog('Transfert', `Téléchargement validé pour : ${docs[docIndex].title}`);
+      localStorage.setItem(KEYS.DOCUMENTS, JSON.stringify(docs));
     }
   },
 
-  // Visitor Tracking
-  trackMovement: (path: string) => {
-    const activities = storageService.getVisitorActivities();
-    const newAct = {
-      id: Math.random().toString(36).substr(2, 9),
-      path,
-      timestamp: new Date().toISOString()
-    };
-    localStorage.setItem(KEYS.ACTIVITY, JSON.stringify([newAct, ...activities].slice(0, 20)));
-  },
-  getVisitorActivities: (): VisitorActivity[] => {
-    const data = localStorage.getItem(KEYS.ACTIVITY);
-    return data ? JSON.parse(data) : [];
+  // --- LOGS & STATS ---
+  logVisit: () => {
+    const data = localStorage.getItem(KEYS.STATS);
+    const s = data ? JSON.parse(data) : { totalVisits: 0, totalDownloads: 0 };
+    localStorage.setItem(KEYS.STATS, JSON.stringify({ ...s, totalVisits: (s.totalVisits || 0) + 1 }));
   },
 
-  // Stats & Logs
-  getStats: (): Stats => {
-    const data = localStorage.getItem(KEYS.STATS);
-    return data ? JSON.parse(data) : { totalVisits: 0, totalDownloads: 0 };
+  logDownload: (email: string, fileName: string) => {
+    const activities = JSON.parse(localStorage.getItem(KEYS.VISITOR_ACTIVITY) || '[]');
+    const newAct = { id: `d-${Date.now()}`, type: 'DOWNLOAD', email, fileName, timestamp: new Date().toLocaleString() };
+    localStorage.setItem(KEYS.VISITOR_ACTIVITY, JSON.stringify([newAct, ...activities].slice(0, 500)));
   },
-  updateStats: (v: number, d: number) => {
-    const s = storageService.getStats();
-    localStorage.setItem(KEYS.STATS, JSON.stringify({ totalVisits: s.totalVisits + v, totalDownloads: s.totalDownloads + d }));
-  },
-  getLogs: (): ActivityLog[] => {
-    const data = localStorage.getItem(KEYS.LOGS);
-    return data ? JSON.parse(data) : [];
-  },
-  addLog: (action: string, details: string) => {
+
+  getVisitorActivities: () => JSON.parse(localStorage.getItem(KEYS.VISITOR_ACTIVITY) || '[]'),
+  getLogs: () => JSON.parse(localStorage.getItem(KEYS.LOGS) || '[]'),
+  addLog: (action: any, details: string) => {
     const logs = storageService.getLogs();
     const newLog = { id: Date.now().toString(), action, details, timestamp: new Date().toLocaleString() };
-    localStorage.setItem(KEYS.LOGS, JSON.stringify([newLog, ...logs].slice(0, 50)));
-  },
-
-  // User Session Management
-  getUser: (): UserSession | null => {
-    const data = localStorage.getItem(KEYS.USER);
-    return data ? JSON.parse(data) : null;
-  },
-  setUser: (email: string, country: string) => {
-    const session: UserSession = { email, country, isValidated: true };
-    localStorage.setItem(KEYS.USER, JSON.stringify(session));
-    storageService.addLog('Utilisateur', `Nouveau profil validé : ${email} (${country})`);
-  },
-  getNewPostFlag: () => {
-    const count = storageService.getDocuments().length;
-    const lastCount = Number(localStorage.getItem(KEYS.LAST_DOC_COUNT) || count);
-    return count > lastCount;
-  },
-  acknowledgeNewPosts: () => {
-    localStorage.setItem(KEYS.LAST_DOC_COUNT, storageService.getDocuments().length.toString());
+    localStorage.setItem(KEYS.LOGS, JSON.stringify([newLog, ...logs].slice(0, 100)));
   }
 };
