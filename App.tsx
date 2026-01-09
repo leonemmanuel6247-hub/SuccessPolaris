@@ -261,7 +261,7 @@ const App: React.FC = () => {
       <footer className="fixed bottom-0 left-0 w-full py-4 px-6 md:px-12 bg-slate-950/90 backdrop-blur-3xl border-t border-white/5 flex flex-col sm:flex-row items-center justify-between z-[1000] shadow-[0_-15px_60px_rgba(0,0,0,0.8)] gap-4">
         <div className="flex items-center gap-4">
           <div className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse shadow-[0_0_15px_#00d4ff]"></div>
-          <p className="text-[8px] md:text-[9px] text-white/30 font-black uppercase tracking-[0.4em]">SuccessPolaris — v6.2.0 — Astral Palace</p>
+          <p className="text-[8px] md:text-[9px] text-white/30 font-black uppercase tracking-[0.4em]">SuccessPolaris — v1.0.0 — Astral Palace</p>
         </div>
         
         <div className="text-center sm:text-right">
