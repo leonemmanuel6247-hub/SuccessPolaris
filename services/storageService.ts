@@ -1,5 +1,6 @@
-import { Category, Document, AdminAccount, VisitorActivity } from '../types.ts';
-import { INITIAL_CATEGORIES, INITIAL_DOCUMENTS } from '../constants.ts';
+
+import { Category, Document, AdminAccount, VisitorActivity, ActivityLog } from '../types.ts';
+import { INITIAL_CATEGORIES, INITIAL_DOCUMENTS, GOOGLE_SHEET_ID } from '../constants.ts';
 
 const KEYS = {
   CATEGORIES: 'sp_categories',
@@ -7,36 +8,63 @@ const KEYS = {
   STATS: 'sp_stats',
   LOGS: 'sp_logs',
   VISITOR_ACTIVITY: 'sp_visitor_spy_logs',
-  ACCOUNTS: 'sp_admin_accounts'
+  ACCOUNTS: 'sp_admin_accounts',
+  LAST_SYNC: 'sp_last_sync'
 };
 
-const safeGetItem = (key: string): string | null => {
-  try {
-    return localStorage.getItem(key);
-  } catch (e) {
-    console.warn("LocalStorage access denied or unavailable", e);
-    return null;
-  }
-};
-
-const safeSetItem = (key: string, value: string) => {
-  try {
-    localStorage.setItem(key, value);
-  } catch (e) {
-    console.error("Failed to save to LocalStorage", e);
-  }
-};
-
-const parseJson = <T>(data: string | null, fallback: T): T => {
-  if (!data) return fallback;
-  try {
-    return JSON.parse(data) as T;
-  } catch (e) {
-    return fallback;
-  }
+const parseCSV = (csv: string) => {
+  const lines = csv.split('\n');
+  const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+  return lines.slice(1).map(line => {
+    const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.trim().replace(/"/g, ''));
+    const obj: any = {};
+    headers.forEach((header, i) => {
+      obj[header] = values[i];
+    });
+    return obj;
+  });
 };
 
 export const storageService = {
+  // --- GOOGLE SHEETS SYNC ---
+  fetchFromSheets: async (): Promise<{ categories: Category[], documents: Document[] }> => {
+    try {
+      // On récupère les deux onglets (Documents par défaut, on peut spécifier gid pour les autres)
+      // Note: Pour faire simple, on utilise un seul onglet "Documents" pour l'instant 
+      // ou on peut faire deux appels fetch si l'utilisateur a plusieurs onglets.
+      const docResponse = await fetch(`https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Documents`);
+      const catResponse = await fetch(`https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Categories`);
+      
+      const docCsv = await docResponse.text();
+      const catCsv = await catResponse.text();
+
+      const documents = parseCSV(docCsv).filter(d => d.id).map(d => ({
+        ...d,
+        downloads: parseInt(d.downloads) || 0,
+        tags: d.tags ? d.tags.split('|') : [],
+        fileUrl: storageService.optimizeDriveUrl(d.fileUrl)
+      }));
+
+      const categories = parseCSV(catCsv).filter(c => c.id).map(c => ({
+        ...c,
+        parentId: c.parentId === "" || c.parentId === "null" ? null : c.parentId
+      }));
+
+      // Sauvegarde locale pour le mode offline / cache
+      localStorage.setItem(KEYS.DOCUMENTS, JSON.stringify(documents));
+      localStorage.setItem(KEYS.CATEGORIES, JSON.stringify(categories));
+      localStorage.setItem(KEYS.LAST_SYNC, new Date().toISOString());
+      
+      return { categories, documents };
+    } catch (error) {
+      console.error("Erreur de synchronisation Google Sheets:", error);
+      return { 
+        categories: JSON.parse(localStorage.getItem(KEYS.CATEGORIES) || '[]'), 
+        documents: JSON.parse(localStorage.getItem(KEYS.DOCUMENTS) || '[]') 
+      };
+    }
+  },
+
   optimizeDriveUrl: (url: string): string => {
     if (url.includes('drive.google.com')) {
       const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
@@ -50,120 +78,28 @@ export const storageService = {
 
   // --- ACCOUNTS ---
   getAccounts: (): AdminAccount[] => {
-    const data = safeGetItem(KEYS.ACCOUNTS);
+    const data = localStorage.getItem(KEYS.ACCOUNTS);
     if (!data) {
       const master: AdminAccount[] = [{ id: '1', username: 'Léon', role: 'MASTER', lastLogin: new Date().toLocaleString() }];
-      safeSetItem(KEYS.ACCOUNTS, JSON.stringify(master));
+      localStorage.setItem(KEYS.ACCOUNTS, JSON.stringify(master));
       return master;
     }
-    return parseJson<AdminAccount[]>(data, []);
+    return JSON.parse(data);
   },
 
-  addAccount: (username: string) => {
-    const accounts = storageService.getAccounts();
-    const newAcc: AdminAccount = {
-      id: `acc-${Date.now()}`,
-      username,
-      role: 'EDITOR',
-      lastLogin: 'Jamais'
-    };
-    safeSetItem(KEYS.ACCOUNTS, JSON.stringify([...accounts, newAcc]));
-    storageService.addLog('ACCOUNT', `Nouveau compte créé : ${username}`);
-  },
-
-  deleteAccount: (id: string) => {
-    const accounts = storageService.getAccounts().filter(a => a.id !== id);
-    safeSetItem(KEYS.ACCOUNTS, JSON.stringify(accounts));
-  },
-
-  // --- CATEGORIES ---
+  // --- GETTERS ---
   getCategories: (): Category[] => {
-    const data = safeGetItem(KEYS.CATEGORIES);
-    if (!data) {
-      safeSetItem(KEYS.CATEGORIES, JSON.stringify(INITIAL_CATEGORIES));
-      return INITIAL_CATEGORIES;
-    }
-    return parseJson<Category[]>(data, INITIAL_CATEGORIES);
+    const data = localStorage.getItem(KEYS.CATEGORIES);
+    return data ? JSON.parse(data) : INITIAL_CATEGORIES;
   },
 
-  saveCategory: (name: string, parentId: string | null): Category => {
-    const cats = storageService.getCategories();
-    const newCat: Category = { 
-      id: `cat-${Date.now()}-${Math.floor(Math.random() * 1000000)}`, 
-      name: name.trim(), 
-      parentId 
-    };
-    safeSetItem(KEYS.CATEGORIES, JSON.stringify([...cats, newCat]));
-    storageService.addLog('SYSTEM', `Node créé : ${name}`);
-    return newCat;
-  },
-
-  ensureCategoryPath: (path: string): string => {
-    const parts = path.split('>').map(p => p.trim()).filter(p => p !== "");
-    let currentParentId: string | null = null;
-    let lastId = "";
-
-    for (const part of parts) {
-      const cats = storageService.getCategories();
-      const existing = cats.find(c => 
-        c.name.toLowerCase() === part.toLowerCase() && 
-        c.parentId === currentParentId
-      );
-
-      if (existing) {
-        currentParentId = existing.id;
-        lastId = existing.id;
-      } else {
-        const newCat = storageService.saveCategory(part, currentParentId);
-        currentParentId = newCat.id;
-        lastId = newCat.id;
-      }
-    }
-    return lastId;
-  },
-
-  deleteCategory: (id: string) => {
-    const allCats = storageService.getCategories();
-    const toDelete = new Set([id]);
-    
-    let foundNew = true;
-    while(foundNew) {
-      foundNew = false;
-      allCats.forEach(c => {
-        if(c.parentId && toDelete.has(c.parentId) && !toDelete.has(c.id)) {
-          toDelete.add(c.id);
-          foundNew = true;
-        }
-      });
-    }
-
-    const filteredCats = allCats.filter(c => !toDelete.has(c.id));
-    const filteredDocs = storageService.getDocuments().filter(d => !toDelete.has(d.categoryId));
-    
-    safeSetItem(KEYS.CATEGORIES, JSON.stringify(filteredCats));
-    safeSetItem(KEYS.DOCUMENTS, JSON.stringify(filteredDocs));
-    storageService.addLog('DELETE', `Suppression de ${toDelete.size} sections`);
-  },
-
-  // --- DOCUMENTS ---
   getDocuments: (): Document[] => {
-    const data = safeGetItem(KEYS.DOCUMENTS);
-    return parseJson<Document[]>(data, INITIAL_DOCUMENTS);
+    const data = localStorage.getItem(KEYS.DOCUMENTS);
+    return data ? JSON.parse(data) : INITIAL_DOCUMENTS;
   },
 
-  addDocument: async (docData: Omit<Document, 'id' | 'downloads' | 'dateAdded'>) => {
-    const docs = storageService.getDocuments();
-    const optimizedUrl = storageService.optimizeDriveUrl(docData.fileUrl);
-    
-    const newDoc: Document = {
-      ...docData,
-      fileUrl: optimizedUrl,
-      id: `doc-${Date.now()}`,
-      downloads: 0,
-      dateAdded: new Date().toISOString()
-    };
-    safeSetItem(KEYS.DOCUMENTS, JSON.stringify([newDoc, ...docs]));
-    storageService.addLog('UPLOAD', `Publication Drive : ${docData.title}`);
+  getLastSync: (): string => {
+    return localStorage.getItem(KEYS.LAST_SYNC) || 'Jamais';
   },
 
   incrementDownload: (id: string) => {
@@ -171,35 +107,39 @@ export const storageService = {
     const docIndex = docs.findIndex(d => d.id === id);
     if (docIndex > -1) {
       docs[docIndex].downloads += 1;
-      safeSetItem(KEYS.DOCUMENTS, JSON.stringify(docs));
+      localStorage.setItem(KEYS.DOCUMENTS, JSON.stringify(docs));
     }
   },
 
   // --- LOGS & STATS ---
   logVisit: () => {
-    const data = safeGetItem(KEYS.STATS);
-    const s = parseJson<{totalVisits: number, totalDownloads: number}>(data, { totalVisits: 0, totalDownloads: 0 });
-    safeSetItem(KEYS.STATS, JSON.stringify({ ...s, totalVisits: (s.totalVisits || 0) + 1 }));
+    const data = localStorage.getItem(KEYS.STATS);
+    const s = data ? JSON.parse(data) : { totalVisits: 0 };
+    localStorage.setItem(KEYS.STATS, JSON.stringify({ ...s, totalVisits: (s.totalVisits || 0) + 1 }));
   },
 
   logDownload: (email: string, fileName: string) => {
-    const data = safeGetItem(KEYS.VISITOR_ACTIVITY);
-    const activities = parseJson<VisitorActivity[]>(data, []);
+    const data = localStorage.getItem(KEYS.VISITOR_ACTIVITY);
+    const activities = data ? JSON.parse(data) : [];
     const newAct: VisitorActivity = { id: `d-${Date.now()}`, type: 'DOWNLOAD', email, fileName, timestamp: new Date().toLocaleString() };
-    safeSetItem(KEYS.VISITOR_ACTIVITY, JSON.stringify([newAct, ...activities].slice(0, 500)));
+    localStorage.setItem(KEYS.VISITOR_ACTIVITY, JSON.stringify([newAct, ...activities].slice(0, 500)));
   },
 
   getVisitorActivities: (): VisitorActivity[] => {
-    return parseJson<VisitorActivity[]>(safeGetItem(KEYS.VISITOR_ACTIVITY), []);
+    const data = localStorage.getItem(KEYS.VISITOR_ACTIVITY);
+    return data ? JSON.parse(data) : [];
   },
 
-  getLogs: (): any[] => {
-    return parseJson<any[]>(safeGetItem(KEYS.LOGS), []);
+  // Fix: Added missing getLogs method to storageService
+  getLogs: (): ActivityLog[] => {
+    const data = localStorage.getItem(KEYS.LOGS);
+    return data ? JSON.parse(data) : [];
   },
 
   addLog: (action: any, details: string) => {
-    const logs = storageService.getLogs();
+    const data = localStorage.getItem(KEYS.LOGS);
+    const logs = data ? JSON.parse(data) : [];
     const newLog = { id: Date.now().toString(), action, details, timestamp: new Date().toLocaleString() };
-    safeSetItem(KEYS.LOGS, JSON.stringify([newLog, ...logs].slice(0, 100)));
+    localStorage.setItem(KEYS.LOGS, JSON.stringify([newLog, ...logs].slice(0, 100)));
   }
 };

@@ -10,6 +10,9 @@ export const THEME = {
   glassBg: 'rgba(15, 23, 42, 0.6)'
 };
 
-export const INITIAL_CATEGORIES: Category[] = [];
+// --- CONFIGURATION DYNAMIQUE ---
+// REMPLACE CET ID PAR CELUI DE TA FEUILLE GOOGLE SHEETS PUBLIÉE
+export const GOOGLE_SHEET_ID = '1XpY_vOTRE_ID_ICI'; 
 
+export const INITIAL_CATEGORIES: Category[] = [];
 export const INITIAL_DOCUMENTS: Document[] = [];

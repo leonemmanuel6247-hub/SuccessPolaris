@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
@@ -25,12 +26,12 @@ const removeLoader = () => {
     }
 };
 
-// Exécution de la suppression après un court délai pour assurer une transition fluide
+// Exécution de la suppression
 if (document.readyState === 'complete') {
     removeLoader();
 } else {
     window.addEventListener('load', removeLoader);
 }
 
-// Sécurité : suppression forcée après 4 secondes si le script est bloqué par autre chose
-setTimeout(removeLoader, 4000);
+// Sécurité supplémentaire
+setTimeout(removeLoader, 3000);
