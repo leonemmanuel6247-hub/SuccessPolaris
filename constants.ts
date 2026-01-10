@@ -11,8 +11,10 @@ export const THEME = {
 };
 
 // --- CONFIGURATION DYNAMIQUE ---
-// ID Google Sheets réel fourni par l'utilisateur
 export const GOOGLE_SHEET_ID = '1fg-tStXc8E04WLqkHxDfrEJR7yf6ix0uzL4y52HF0k0'; 
+
+// URL du Webhook Google Apps Script final fournie
+export const APPS_SCRIPT_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbxsxCg3mvJsSFSTDK-2q7yViH0jhCr1TH4yELAGl2j7NUoykvJzVG_hyQRSXUSmfDDf/exec';
 
 export const INITIAL_CATEGORIES: Category[] = [];
 export const INITIAL_DOCUMENTS: Document[] = [];

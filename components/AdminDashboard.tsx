@@ -69,10 +69,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
     const catName = targetCat ? targetCat.name.toLowerCase() : 'terminale';
 
     if (mode === 'category') {
-      // Pour une catégorie, on génère juste un exemple ou une instruction
       setGeneratedRow(`Structure : "${newItem.name.toLowerCase()}","","${catName}",""`);
     } else {
-      // Mapping impératif : Titre, Lien, Catégorie, Sous-Catégorie
       setGeneratedRow(`"${newItem.title}","${newItem.url.trim()}","${catName}","${newItem.subCat.toLowerCase()}"`);
     }
     setIsPublished(true);
@@ -107,6 +105,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
     dateAdded: new Date().toISOString(),
     size: newItem.size
   };
+
+  // CODE GOOGLE APPS SCRIPT À COPIER
+  const appsScriptCode = `function doPost(e) {
+  var sheetName = "LOGS_ESPION";
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(sheetName);
+  
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    sheet.appendRow(["Email", "Date", "Fichier"]);
+    sheet.setFrozenRows(1);
+    sheet.getRange("A1:C1").setFontWeight("bold").setBackground("#cfe2f3");
+  }
+  
+  try {
+    var data = JSON.parse(e.postData.contents);
+    sheet.appendRow([data.email, data.timestamp, data.fileName]);
+    return ContentService.createTextOutput("Success").setMimeType(ContentService.MimeType.TEXT);
+  } catch (err) {
+    return ContentService.createTextOutput("Error: " + err.message).setMimeType(ContentService.MimeType.TEXT);
+  }
+}`;
 
   return (
     <div className="bg-slate-950/40 rounded-[2rem] md:rounded-[3rem] border border-white/5 overflow-hidden backdrop-blur-3xl shadow-2xl flex flex-col min-h-[600px]">
@@ -155,8 +175,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
                 <p className="text-[10px] text-white/30 font-black uppercase tracking-[0.5em]">Étape {publishStep + 1} / 6</p>
               )}
             </div>
-
-            <div className="bg-white/[0.03] border border-white/10 rounded-[3.5rem] p-10 md:p-16 relative overflow-hidden backdrop-blur-3xl">
+            <div className="bg-white/[0.03] border border-white/10 rounded-[3.5rem] p-10 relative overflow-hidden backdrop-blur-3xl">
                {isPublished ? (
                  <div className="space-y-10 animate-in text-center">
                     <div className="w-24 h-24 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto border border-emerald-500/30 shadow-[0_0_60px_rgba(16,185,129,0.2)]">
@@ -168,11 +187,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
                          Copiez cette ligne et insérez-la dans votre Google Sheet :
                        </p>
                     </div>
-
                     <div className="bg-black/90 rounded-[2rem] p-8 border border-cyan-500/30 font-mono text-cyan-400 break-all select-all text-[12px]">
                         {generatedRow}
                     </div>
-
                     <div className="flex gap-4 pt-8">
                        <button onClick={resetWizard} className="flex-1 bg-white/5 text-white/60 py-5 rounded-2xl text-[10px] font-black uppercase border border-white/10">Nouveau</button>
                        <button onClick={() => window.open(`https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/edit`, '_blank')} className="flex-[2] bg-white text-slate-950 py-5 rounded-2xl text-[10px] font-black uppercase">Ouvrir Sheets</button>
@@ -189,7 +206,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
                        </button>
                      </div>
                    )}
-
                    {publishStep === 1 && (
                      <div className="space-y-8 animate-in">
                        <h4 className="text-white text-center font-black uppercase tracking-widest text-sm">Lien Google Drive</h4>
@@ -197,7 +213,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
                        <button onClick={() => setPublishStep(2)} className="w-full bg-white text-slate-950 py-5 rounded-2xl text-[10px] font-black uppercase">Suivant</button>
                      </div>
                    )}
-
                    {publishStep === 2 && (
                      <div className="space-y-8 animate-in">
                        <h4 className="text-white text-center font-black uppercase tracking-widest text-sm">Titre de l'Archive</h4>
@@ -205,7 +220,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
                        <button onClick={() => setPublishStep(3)} className="w-full bg-white text-slate-950 py-5 rounded-2xl text-[10px] font-black uppercase">Suivant</button>
                      </div>
                    )}
-
                    {publishStep === 3 && (
                      <div className="space-y-8 animate-in">
                        <h4 className="text-white text-center font-black uppercase tracking-widest text-sm">Secteur (Niveau 1)</h4>
@@ -216,7 +230,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
                        <button onClick={() => setPublishStep(4)} className="w-full bg-white text-slate-950 py-5 rounded-2xl text-[10px] font-black uppercase">Suivant</button>
                      </div>
                    )}
-
                    {publishStep === 4 && (
                      <div className="space-y-8 animate-in">
                        <h4 className="text-white text-center font-black uppercase tracking-widest text-sm">Matière (Sous-Catégorie)</h4>
@@ -224,7 +237,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
                        <button onClick={() => setPublishStep(5)} className="w-full bg-white text-slate-950 py-5 rounded-2xl text-[10px] font-black uppercase">Suivant</button>
                      </div>
                    )}
-
                    {publishStep === 5 && (
                      <div className="space-y-12 animate-in text-center">
                        <h4 className="text-white font-black uppercase tracking-widest text-sm">Prévisualisation Néon</h4>
@@ -242,8 +254,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
         )}
 
         {activeTab === 'spy' && (
-          <div className="space-y-8 animate-in">
-             <div className="bg-black/40 rounded-[2rem] border border-white/5 p-6 overflow-x-auto">
+          <div className="space-y-12 animate-in">
+             <div className="bg-indigo-500/5 p-8 rounded-[2rem] border border-indigo-500/20">
+                <h3 className="text-white font-black uppercase tracking-widest text-sm mb-6 flex items-center gap-4">
+                  <i className="fas fa-terminal text-cyan-400"></i> Code Tracking Cloud
+                </h3>
+                <p className="text-[10px] text-white/40 uppercase font-black mb-6 leading-relaxed">
+                  Collez ce code dans "Extensions > Apps Script" de votre Google Sheet pour activer l'onglet "LOGS_ESPION" en temps réel.
+                </p>
+                <div className="relative group">
+                    <pre className="bg-black/80 p-6 rounded-2xl text-[10px] font-mono text-cyan-500/80 overflow-x-auto border border-white/5 group-hover:border-cyan-500/30 transition-all select-all">
+                      {appsScriptCode}
+                    </pre>
+                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => navigator.clipboard.writeText(appsScriptCode)} className="bg-white/10 hover:bg-cyan-500 text-white p-2 rounded-lg text-[10px] uppercase font-black">Copier</button>
+                    </div>
+                </div>
+             </div>
+
+             <div className="bg-black/40 rounded-[2rem] border border-white/5 p-6 overflow-x-auto shadow-2xl">
+                <h4 className="text-white font-black uppercase tracking-widest text-[10px] mb-6 opacity-30">Dernières Activités Locales</h4>
                 <table className="w-full text-left">
                     <thead>
                         <tr className="text-[8px] uppercase font-black text-white/20 tracking-[0.4em] border-b border-white/10">
@@ -266,7 +296,40 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
           </div>
         )}
         
-        {/* Logs and Keys sections omitted for brevity but remain functional */}
+        {activeTab === 'logs' && (
+          <div className="space-y-3 animate-in">
+            {storageService.getLogs().map(log => (
+              <div key={log.id} className="bg-white/[0.02] p-4 rounded-xl text-[10px] font-mono border border-white/5 flex gap-4">
+                   <span className="text-white/10">[{log.timestamp}]</span>
+                   <span className="text-cyan-400 font-black uppercase">{log.action}</span>
+                   <span className="text-white/60">"{log.details}"</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeTab === 'keys' && currentAdmin?.role === 'SUPER_MASTER' && (
+          <div className="space-y-10 animate-in">
+            <div className="bg-slate-900/40 border border-white/10 rounded-[2.5rem] p-8">
+               <h3 className="text-[12px] font-black text-white uppercase italic mb-6 text-cyan-400 tracking-widest">Forger une Clé</h3>
+               <div className="flex gap-4">
+                  <input type="text" placeholder="Utilisateur..." value={newKeyName} onChange={e => setNewKeyName(e.target.value)} className="flex-1 bg-black/60 border border-white/10 rounded-2xl p-5 text-white text-[12px] outline-none" />
+                  <button onClick={handleAddKey} className="bg-white text-slate-950 px-10 rounded-2xl text-[10px] font-black uppercase tracking-widest">Forger</button>
+               </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               {accounts.map(acc => (
+                 <div key={acc.id} className="bg-white/[0.03] p-6 rounded-3xl border border-white/5 flex items-center justify-between">
+                    <div>
+                       <p className="text-[13px] font-black text-white">{acc.username}</p>
+                       <p className="text-[8px] text-white/30 uppercase font-black">{acc.role}</p>
+                    </div>
+                    {acc.id !== '0' && <button onClick={() => handleRemoveKey(acc.id)} className="text-red-500 text-xs font-black uppercase tracking-widest">Révoquer</button>}
+                 </div>
+               ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

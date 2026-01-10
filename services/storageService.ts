@@ -1,6 +1,6 @@
 
 import { Category, Document, AdminAccount, VisitorActivity } from '../types.ts';
-import { GOOGLE_SHEET_ID } from '../constants.ts';
+import { GOOGLE_SHEET_ID, APPS_SCRIPT_WEBHOOK_URL } from '../constants.ts';
 
 const KEYS = {
   CATEGORIES: 'sp_categories',
@@ -9,16 +9,15 @@ const KEYS = {
   LOGS: 'sp_logs',
   VISITOR_ACTIVITY: 'sp_visitor_spy_logs',
   ACCOUNTS: 'sp_admin_accounts',
-  LAST_SYNC: 'sp_last_sync'
+  LAST_SYNC: 'sp_last_sync',
+  USER_EMAIL: 'sp_user_identity'
 };
 
 const parseCSV = (csv: string) => {
   const lines = csv.split('\n').filter(line => line.trim() !== '');
   if (lines.length === 0) return [];
   
-  // Mapping impératif : Col A (0) = Titre, Col B (1) = Lien, Col C (2) = Catégorie, Col D (3) = Sous-Catégorie
   return lines.slice(1).map((line, index) => {
-    // Regex pour gérer les virgules dans les guillemets
     const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.trim().replace(/^"|"$/g, ''));
     return {
       title: values[0] || '',
@@ -33,7 +32,6 @@ const parseCSV = (csv: string) => {
 export const storageService = {
   fetchFromSheets: async (): Promise<{ categories: Category[], documents: Document[] }> => {
     try {
-      // Récupération du CSV brut
       const csvUrl = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/export?format=csv&gid=0`;
       const response = await fetch(csvUrl);
       if (!response.ok) throw new Error('Matrice Polaris injoignable');
@@ -46,14 +44,12 @@ export const storageService = {
       const categoryMap = new Map<string, string>();
 
       rawRows.forEach(row => {
-        // Sécurité : Ignorer les lignes sans titre ou sans lien
         if (!row.title || !row.url || !row.category) return;
 
-        // Normalisation : On stocke tout en MAJUSCULES pour l'interface
+        // Normalisation Insensible à la casse pour l'UI
         const mainCatName = row.category.trim().toUpperCase();
         const subCatName = row.subCategory ? row.subCategory.trim().toUpperCase() : null;
 
-        // 1. Génération automatique de la Catégorie Principale (Col C)
         if (!categoryMap.has(mainCatName)) {
           const catId = `cat-${mainCatName.replace(/\s+/g, '-')}`;
           categoryMap.set(mainCatName, catId);
@@ -67,7 +63,6 @@ export const storageService = {
 
         let currentParentId = categoryMap.get(mainCatName)!;
 
-        // 2. Génération automatique de la Sous-Catégorie (Col D)
         if (subCatName) {
           const subKey = `${mainCatName}_${subCatName}`;
           if (!categoryMap.has(subKey)) {
@@ -83,7 +78,6 @@ export const storageService = {
           currentParentId = categoryMap.get(subKey)!;
         }
 
-        // 3. Création du Document
         documents.push({
           id: row.id,
           title: row.title,
@@ -104,8 +98,7 @@ export const storageService = {
       
       return { categories, documents };
     } catch (error) {
-      console.error("ERREUR CRITIQUE MATRICE :", error);
-      // Fallback local en cas d'erreur réseau
+      console.error("ERREUR MATRICE :", error);
       return { 
         categories: JSON.parse(localStorage.getItem(KEYS.CATEGORIES) || '[]'), 
         documents: JSON.parse(localStorage.getItem(KEYS.DOCUMENTS) || '[]') 
@@ -114,14 +107,38 @@ export const storageService = {
   },
 
   optimizeDriveUrl: (url: string): string => {
-    if (!url || url === 'undefined' || url === '') return '';
-    // Conversion lien de partage Drive en lien de téléchargement direct
+    if (!url || url === '' || url === 'undefined') return '';
     if (url.includes('drive.google.com')) {
       const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
       const id = idMatch ? idMatch[1] : null;
       if (id) return `https://drive.google.com/uc?export=download&id=${id}`;
     }
     return url;
+  },
+
+  // GESTION DE L'IDENTITÉ UTILISATEUR
+  saveUserEmail: (email: string) => localStorage.setItem(KEYS.USER_EMAIL, email),
+  getUserEmail: () => localStorage.getItem(KEYS.USER_EMAIL),
+
+  // ENVOI DES LOGS CLOUD (Arrière-plan discret)
+  sendToCloudLog: async (email: string, fileName: string, action: string = 'Téléchargement') => {
+    const payload = {
+      email,
+      action,
+      fichier: fileName,
+      timestamp: new Date().toLocaleString('fr-FR')
+    };
+
+    try {
+      fetch(APPS_SCRIPT_WEBHOOK_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } catch (e) {
+      console.warn("Échec du traçage cloud (silencieux)");
+    }
   },
 
   getAccounts: (): AdminAccount[] => {
