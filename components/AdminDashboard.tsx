@@ -17,22 +17,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
   const [activities, setActivities] = useState<VisitorActivity[]>([]);
   const [accounts, setAccounts] = useState<AdminAccount[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [bannedList, setBannedList] = useState<string[]>([]);
 
   // Wizard state
   const [publishStep, setPublishStep] = useState(0);
-  const [mode, setMode] = useState<'category' | 'document'>('document');
   const [isPublished, setIsPublished] = useState(false);
-  
   const [newKeyName, setNewKeyName] = useState('');
   const [parentSelection, setParentSelection] = useState<string>('root');
   const [newItem, setNewItem] = useState({
-    name: '',
-    icon: '📁',
     title: '',
-    description: '',
     url: '',
-    size: '1.0 MB',
-    tags: 'Cours|Révision',
     subCat: 'Matière'
   });
 
@@ -41,6 +35,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
   useEffect(() => {
     setActivities(storageService.getVisitorActivities());
     setAccounts(storageService.getAccounts());
+    setBannedList(storageService.getBannedEmails());
   }, []);
 
   const handleManualSync = async () => {
@@ -54,7 +49,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
     storageService.addAccount(newKeyName, 'MASTER');
     setAccounts(storageService.getAccounts());
     setNewKeyName('');
-    storageService.addLog('ACCOUNT', `Nouvelle clé créée pour ${newKeyName}`);
+    storageService.addLog('ACCOUNT', `Nouvelle clé forgée : ${newKeyName}`);
   };
 
   const handleRemoveKey = (id: string) => {
@@ -64,68 +59,40 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
     storageService.addLog('ACCOUNT', `Clé révoquée (ID: ${id})`);
   };
 
+  const handleBan = (email: string) => {
+    storageService.banEmail(email);
+    setBannedList(storageService.getBannedEmails());
+  };
+
+  const handleUnban = (email: string) => {
+    storageService.unbanEmail(email);
+    setBannedList(storageService.getBannedEmails());
+  };
+
   const handleFinalPublish = () => {
     const targetCat = categories.find(c => c.id === parentSelection);
     const catName = targetCat ? targetCat.name.toLowerCase() : 'terminale';
-
-    if (mode === 'category') {
-      setGeneratedRow(`Structure : "${newItem.name.toLowerCase()}","","${catName}",""`);
-    } else {
-      setGeneratedRow(`"${newItem.title}","${newItem.url.trim()}","${catName}","${newItem.subCat.toLowerCase()}"`);
-    }
+    setGeneratedRow(`"${newItem.title}","${newItem.url.trim()}","${catName}","${newItem.subCat.toLowerCase()}"`);
     setIsPublished(true);
-    storageService.addLog('UPLOAD', `Publication prête pour : ${newItem.title || newItem.name}`);
+    storageService.addLog('UPLOAD', `Archive prête : ${newItem.title}`);
   };
 
   const resetWizard = () => {
     setPublishStep(0);
     setIsPublished(false);
     setGeneratedRow('');
-    setNewItem({
-      name: '',
-      icon: '📁',
-      title: '',
-      description: '',
-      url: '',
-      size: '1.0 MB',
-      tags: 'Cours|Révision',
-      subCat: 'Matière'
-    });
+    setNewItem({ title: '', url: '', subCat: 'Matière' });
   };
 
-  const previewDoc: Document = {
-    id: 'preview',
-    title: newItem.title.toUpperCase() || 'TITRE POLARIS',
-    description: newItem.description || 'Description en attente...',
-    categoryId: parentSelection,
-    fileUrl: newItem.url,
-    fileType: 'pdf',
-    tags: [newItem.tags],
-    downloads: 0,
-    dateAdded: new Date().toISOString(),
-    size: newItem.size
-  };
-
-  // CODE GOOGLE APPS SCRIPT À COPIER
   const appsScriptCode = `function doPost(e) {
-  var sheetName = "LOGS_ESPION";
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(sheetName);
-  
-  if (!sheet) {
-    sheet = ss.insertSheet(sheetName);
-    sheet.appendRow(["Email", "Date", "Fichier"]);
-    sheet.setFrozenRows(1);
-    sheet.getRange("A1:C1").setFontWeight("bold").setBackground("#cfe2f3");
-  }
-  
+  var sheet = ss.getSheetByName("LOGS_ESPION") || ss.insertSheet("LOGS_ESPION");
+  if (sheet.getLastRow() === 0) sheet.appendRow(["Email", "Action", "Fichier", "Date"]);
   try {
     var data = JSON.parse(e.postData.contents);
-    sheet.appendRow([data.email, data.timestamp, data.fileName]);
-    return ContentService.createTextOutput("Success").setMimeType(ContentService.MimeType.TEXT);
-  } catch (err) {
-    return ContentService.createTextOutput("Error: " + err.message).setMimeType(ContentService.MimeType.TEXT);
-  }
+    sheet.appendRow([data.email, data.action, data.fichier, data.timestamp]);
+    return ContentService.createTextOutput("OK");
+  } catch (err) { return ContentService.createTextOutput("ERR"); }
 }`;
 
   return (
@@ -159,9 +126,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
                <p className="text-white/40 text-[11px] uppercase font-bold tracking-[0.3em] mb-8 leading-loose">
                  Identifiant : <span className="text-cyan-400 font-mono break-all">{GOOGLE_SHEET_ID}</span>
                </p>
-               <div className="flex flex-col sm:flex-row gap-4">
+               <div className="flex gap-4">
                   <button onClick={() => window.open(`https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/edit`, '_blank')} className="flex-1 bg-white text-slate-950 py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-cyan-400 transition-all shadow-lg">Éditer Sheets</button>
-                  <button onClick={handleManualSync} disabled={isSyncing} className="flex-1 bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-cyan-500 hover:text-slate-950 transition-all">{isSyncing ? 'Sync...' : 'Forcer Sync'}</button>
+                  <button onClick={handleManualSync} disabled={isSyncing} className="flex-1 bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest">{isSyncing ? 'Sync...' : 'Forcer Sync'}</button>
                </div>
             </div>
           </div>
@@ -169,84 +136,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
 
         {activeTab === 'architect' && (
           <div className="max-w-4xl mx-auto w-full space-y-12 animate-in py-6">
-            <div className="text-center space-y-4">
-              <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter">Assistant Architecte</h2>
-              {!isPublished && (
-                <p className="text-[10px] text-white/30 font-black uppercase tracking-[0.5em]">Étape {publishStep + 1} / 6</p>
-              )}
-            </div>
             <div className="bg-white/[0.03] border border-white/10 rounded-[3.5rem] p-10 relative overflow-hidden backdrop-blur-3xl">
                {isPublished ? (
                  <div className="space-y-10 animate-in text-center">
-                    <div className="w-24 h-24 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto border border-emerald-500/30 shadow-[0_0_60px_rgba(16,185,129,0.2)]">
-                       <i className="fas fa-check-circle text-emerald-400 text-3xl"></i>
-                    </div>
-                    <div className="space-y-3">
-                       <h3 className="text-white font-black uppercase tracking-[0.3em] text-2xl italic">ARCHIVE PRÊTE</h3>
-                       <p className="text-[11px] text-white/40 font-bold uppercase tracking-widest leading-relaxed">
-                         Copiez cette ligne et insérez-la dans votre Google Sheet :
-                       </p>
-                    </div>
+                    <h3 className="text-white font-black uppercase tracking-[0.3em] text-2xl italic">ARCHIVE PRÊTE</h3>
                     <div className="bg-black/90 rounded-[2rem] p-8 border border-cyan-500/30 font-mono text-cyan-400 break-all select-all text-[12px]">
                         {generatedRow}
                     </div>
-                    <div className="flex gap-4 pt-8">
-                       <button onClick={resetWizard} className="flex-1 bg-white/5 text-white/60 py-5 rounded-2xl text-[10px] font-black uppercase border border-white/10">Nouveau</button>
-                       <button onClick={() => window.open(`https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/edit`, '_blank')} className="flex-[2] bg-white text-slate-950 py-5 rounded-2xl text-[10px] font-black uppercase">Ouvrir Sheets</button>
-                    </div>
+                    <button onClick={resetWizard} className="w-full bg-white/5 text-white/60 py-5 rounded-2xl text-[10px] font-black uppercase border border-white/10">Nouveau</button>
                  </div>
                ) : (
                  <div className="space-y-10">
-                   {publishStep === 0 && (
-                     <div className="space-y-10 animate-in text-center">
-                       <p className="text-white/60 font-medium italic">"Quel savoir matérialiser ?"</p>
-                       <button onClick={() => setPublishStep(1)} className="w-full bg-indigo-500/10 border border-indigo-500/30 p-14 rounded-[3rem] hover:bg-indigo-500 transition-all group">
-                          <span className="block text-5xl mb-6">📄</span>
-                          <span className="block text-white font-black uppercase tracking-widest text-[12px]">Matérialiser Document</span>
-                       </button>
-                     </div>
-                   )}
-                   {publishStep === 1 && (
-                     <div className="space-y-8 animate-in">
-                       <h4 className="text-white text-center font-black uppercase tracking-widest text-sm">Lien Google Drive</h4>
-                       <input type="text" autoFocus placeholder="Lien de partage..." value={newItem.url} onChange={e => setNewItem({...newItem, url: e.target.value})} className="w-full bg-black/60 border border-white/10 rounded-2xl p-6 text-white text-[14px] outline-none focus:border-cyan-400 text-center" />
-                       <button onClick={() => setPublishStep(2)} className="w-full bg-white text-slate-950 py-5 rounded-2xl text-[10px] font-black uppercase">Suivant</button>
-                     </div>
-                   )}
-                   {publishStep === 2 && (
-                     <div className="space-y-8 animate-in">
-                       <h4 className="text-white text-center font-black uppercase tracking-widest text-sm">Titre de l'Archive</h4>
-                       <input type="text" autoFocus placeholder="Nom complet..." value={newItem.title} onChange={e => setNewItem({...newItem, title: e.target.value})} className="w-full bg-black/60 border border-white/10 rounded-2xl p-6 text-white text-[14px] outline-none focus:border-cyan-400 text-center" />
-                       <button onClick={() => setPublishStep(3)} className="w-full bg-white text-slate-950 py-5 rounded-2xl text-[10px] font-black uppercase">Suivant</button>
-                     </div>
-                   )}
+                   {publishStep === 0 && <button onClick={() => setPublishStep(1)} className="w-full bg-indigo-500/10 border border-indigo-500/30 p-14 rounded-[3rem] hover:bg-indigo-500 transition-all group font-black uppercase tracking-widest text-[12px] text-white">Matérialiser Document</button>}
+                   {publishStep === 1 && <div className="space-y-8 animate-in"><input type="text" placeholder="Lien Drive..." value={newItem.url} onChange={e => setNewItem({...newItem, url: e.target.value})} className="w-full bg-black/60 border border-white/10 rounded-2xl p-6 text-white text-center outline-none focus:border-cyan-400" /><button onClick={() => setPublishStep(2)} className="w-full bg-white text-slate-950 py-5 rounded-2xl text-[10px] font-black uppercase">Suivant</button></div>}
+                   {publishStep === 2 && <div className="space-y-8 animate-in"><input type="text" placeholder="Titre..." value={newItem.title} onChange={e => setNewItem({...newItem, title: e.target.value})} className="w-full bg-black/60 border border-white/10 rounded-2xl p-6 text-white text-center outline-none focus:border-cyan-400" /><button onClick={() => setPublishStep(3)} className="w-full bg-white text-slate-950 py-5 rounded-2xl text-[10px] font-black uppercase">Suivant</button></div>}
                    {publishStep === 3 && (
                      <div className="space-y-8 animate-in">
-                       <h4 className="text-white text-center font-black uppercase tracking-widest text-sm">Secteur (Niveau 1)</h4>
-                       <select value={parentSelection} onChange={(e) => setParentSelection(e.target.value)} className="w-full bg-black/60 border border-white/10 rounded-2xl p-6 text-white text-[14px] outline-none focus:border-cyan-400 text-center appearance-none">
-                         <option value="root">-- Sélectionner --</option>
+                       <select value={parentSelection} onChange={(e) => setParentSelection(e.target.value)} className="w-full bg-black/60 border border-white/10 rounded-2xl p-6 text-white text-center outline-none">
+                         <option value="root">-- Secteur --</option>
                          {categories.filter(c => !c.parentId).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                        </select>
                        <button onClick={() => setPublishStep(4)} className="w-full bg-white text-slate-950 py-5 rounded-2xl text-[10px] font-black uppercase">Suivant</button>
                      </div>
                    )}
-                   {publishStep === 4 && (
-                     <div className="space-y-8 animate-in">
-                       <h4 className="text-white text-center font-black uppercase tracking-widest text-sm">Matière (Sous-Catégorie)</h4>
-                       <input type="text" autoFocus placeholder="Nom de la matière..." value={newItem.subCat} onChange={e => setNewItem({...newItem, subCat: e.target.value})} className="w-full bg-black/60 border border-white/10 rounded-2xl p-6 text-white text-[14px] outline-none focus:border-cyan-400 text-center" />
-                       <button onClick={() => setPublishStep(5)} className="w-full bg-white text-slate-950 py-5 rounded-2xl text-[10px] font-black uppercase">Suivant</button>
-                     </div>
-                   )}
-                   {publishStep === 5 && (
-                     <div className="space-y-12 animate-in text-center">
-                       <h4 className="text-white font-black uppercase tracking-widest text-sm">Prévisualisation Néon</h4>
-                       <div className="max-w-[340px] mx-auto">
-                          <DocumentCard doc={previewDoc} onDownload={() => {}} />
-                       </div>
-                       <button onClick={handleFinalPublish} className="w-full bg-cyan-500 text-slate-950 py-7 rounded-[2.5rem] text-[12px] font-black uppercase tracking-[0.5em] shadow-3xl">PUBLIER SUR POLARIS</button>
-                       <button onClick={() => setPublishStep(4)} className="w-full text-white/20 text-[9px] uppercase font-black">Retour</button>
-                     </div>
-                   )}
+                   {publishStep === 4 && <div className="space-y-8 animate-in"><input type="text" placeholder="Matière..." value={newItem.subCat} onChange={e => setNewItem({...newItem, subCat: e.target.value})} className="w-full bg-black/60 border border-white/10 rounded-2xl p-6 text-white text-center outline-none focus:border-cyan-400" /><button onClick={handleFinalPublish} className="w-full bg-cyan-500 text-slate-950 py-7 rounded-[2.5rem] text-[12px] font-black uppercase tracking-[0.5em]">PUBLIER</button></div>}
                  </div>
                )}
             </div>
@@ -256,38 +169,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
         {activeTab === 'spy' && (
           <div className="space-y-12 animate-in">
              <div className="bg-indigo-500/5 p-8 rounded-[2rem] border border-indigo-500/20">
-                <h3 className="text-white font-black uppercase tracking-widest text-sm mb-6 flex items-center gap-4">
-                  <i className="fas fa-terminal text-cyan-400"></i> Code Tracking Cloud
-                </h3>
-                <p className="text-[10px] text-white/40 uppercase font-black mb-6 leading-relaxed">
-                  Collez ce code dans "Extensions > Apps Script" de votre Google Sheet pour activer l'onglet "LOGS_ESPION" en temps réel.
-                </p>
-                <div className="relative group">
-                    <pre className="bg-black/80 p-6 rounded-2xl text-[10px] font-mono text-cyan-500/80 overflow-x-auto border border-white/5 group-hover:border-cyan-500/30 transition-all select-all">
-                      {appsScriptCode}
-                    </pre>
-                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => navigator.clipboard.writeText(appsScriptCode)} className="bg-white/10 hover:bg-cyan-500 text-white p-2 rounded-lg text-[10px] uppercase font-black">Copier</button>
-                    </div>
-                </div>
+                <p className="text-[10px] text-white/40 uppercase font-black mb-6 leading-relaxed">Collez ce code dans "Extensions &gt; Apps Script" de votre Sheet pour activer le tracking.</p>
+                <pre className="bg-black/80 p-6 rounded-2xl text-[10px] font-mono text-cyan-500/80 overflow-x-auto border border-white/5 select-all">{appsScriptCode}</pre>
              </div>
 
              <div className="bg-black/40 rounded-[2rem] border border-white/5 p-6 overflow-x-auto shadow-2xl">
-                <h4 className="text-white font-black uppercase tracking-widest text-[10px] mb-6 opacity-30">Dernières Activités Locales</h4>
                 <table className="w-full text-left">
-                    <thead>
-                        <tr className="text-[8px] uppercase font-black text-white/20 tracking-[0.4em] border-b border-white/10">
-                            <th className="pb-4">Visiteur</th>
-                            <th className="pb-4">Archive</th>
-                            <th className="pb-4 text-right">Instant</th>
-                        </tr>
-                    </thead>
+                    <thead><tr className="text-[8px] uppercase font-black text-white/20 tracking-[0.4em] border-b border-white/10"><th className="pb-4">Visiteur</th><th className="pb-4">Action</th><th className="pb-4 text-right">Contrôle</th></tr></thead>
                     <tbody className="divide-y divide-white/[0.04]">
                         {activities.map(act => (
                             <tr key={act.id}>
                                 <td className="py-4 text-[10px] text-white/80 font-bold">{act.email || 'Anonyme'}</td>
-                                <td className="py-4 text-[9px] text-cyan-400 italic">{act.fileName || 'Navigation'}</td>
-                                <td className="py-4 text-[8px] text-white/10 font-mono text-right">{act.timestamp}</td>
+                                <td className="py-4 text-[9px] text-cyan-400 italic">{act.fileName || 'Archive'}</td>
+                                <td className="py-4 text-right">
+                                  {currentAdmin?.role === 'SUPER_MASTER' && act.email && (
+                                    bannedList.includes(act.email) ? 
+                                    <button onClick={() => handleUnban(act.email!)} className="text-[8px] font-black uppercase text-emerald-400 hover:underline">Réactiver</button> :
+                                    <button onClick={() => handleBan(act.email!)} className="text-[8px] font-black uppercase text-red-500 hover:underline">Bannir</button>
+                                  )}
+                                </td>
                             </tr>
                         ))}
                     </tbody>
@@ -296,6 +196,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
           </div>
         )}
         
+        {activeTab === 'keys' && currentAdmin?.role === 'SUPER_MASTER' && (
+          <div className="space-y-10 animate-in">
+            <div className="bg-slate-900/40 border border-white/10 rounded-[2.5rem] p-8">
+               <h3 className="text-[12px] font-black text-white uppercase italic mb-6 text-cyan-400 tracking-widest">Forger une Clé</h3>
+               <div className="flex gap-4">
+                  <input type="text" placeholder="Pseudo..." value={newKeyName} onChange={e => setNewKeyName(e.target.value)} className="flex-1 bg-black/60 border border-white/10 rounded-2xl p-5 text-white text-[12px] outline-none" />
+                  <button onClick={handleAddKey} className="bg-white text-slate-950 px-10 rounded-2xl text-[10px] font-black uppercase">Forger</button>
+               </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               {accounts.map(acc => (
+                 <div key={acc.id} className="bg-white/[0.03] p-6 rounded-3xl border border-white/5 flex items-center justify-between">
+                    <div><p className="text-[13px] font-black text-white">{acc.username}</p><p className="text-[8px] text-white/30 uppercase font-black">{acc.role}</p></div>
+                    {acc.id !== '0' && <button onClick={() => handleRemoveKey(acc.id)} className="text-red-500 text-xs font-black uppercase tracking-widest">Révoquer</button>}
+                 </div>
+               ))}
+            </div>
+          </div>
+        )}
+
         {activeTab === 'logs' && (
           <div className="space-y-3 animate-in">
             {storageService.getLogs().map(log => (
@@ -305,29 +225,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
                    <span className="text-white/60">"{log.details}"</span>
               </div>
             ))}
-          </div>
-        )}
-
-        {activeTab === 'keys' && currentAdmin?.role === 'SUPER_MASTER' && (
-          <div className="space-y-10 animate-in">
-            <div className="bg-slate-900/40 border border-white/10 rounded-[2.5rem] p-8">
-               <h3 className="text-[12px] font-black text-white uppercase italic mb-6 text-cyan-400 tracking-widest">Forger une Clé</h3>
-               <div className="flex gap-4">
-                  <input type="text" placeholder="Utilisateur..." value={newKeyName} onChange={e => setNewKeyName(e.target.value)} className="flex-1 bg-black/60 border border-white/10 rounded-2xl p-5 text-white text-[12px] outline-none" />
-                  <button onClick={handleAddKey} className="bg-white text-slate-950 px-10 rounded-2xl text-[10px] font-black uppercase tracking-widest">Forger</button>
-               </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               {accounts.map(acc => (
-                 <div key={acc.id} className="bg-white/[0.03] p-6 rounded-3xl border border-white/5 flex items-center justify-between">
-                    <div>
-                       <p className="text-[13px] font-black text-white">{acc.username}</p>
-                       <p className="text-[8px] text-white/30 uppercase font-black">{acc.role}</p>
-                    </div>
-                    {acc.id !== '0' && <button onClick={() => handleRemoveKey(acc.id)} className="text-red-500 text-xs font-black uppercase tracking-widest">Révoquer</button>}
-                 </div>
-               ))}
-            </div>
           </div>
         )}
       </div>

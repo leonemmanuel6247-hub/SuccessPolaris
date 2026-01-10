@@ -10,7 +10,8 @@ const KEYS = {
   VISITOR_ACTIVITY: 'sp_visitor_spy_logs',
   ACCOUNTS: 'sp_admin_accounts',
   LAST_SYNC: 'sp_last_sync',
-  USER_EMAIL: 'sp_user_identity'
+  USER_EMAIL: 'sp_user_identity',
+  BANNED_EMAILS: 'sp_banned_list'
 };
 
 const parseCSV = (csv: string) => {
@@ -46,19 +47,13 @@ export const storageService = {
       rawRows.forEach(row => {
         if (!row.title || !row.url || !row.category) return;
 
-        // Normalisation Insensible à la casse pour l'UI
         const mainCatName = row.category.trim().toUpperCase();
         const subCatName = row.subCategory ? row.subCategory.trim().toUpperCase() : null;
 
         if (!categoryMap.has(mainCatName)) {
           const catId = `cat-${mainCatName.replace(/\s+/g, '-')}`;
           categoryMap.set(mainCatName, catId);
-          categories.push({
-            id: catId,
-            name: mainCatName,
-            parentId: null,
-            icon: '🪐'
-          });
+          categories.push({ id: catId, name: mainCatName, parentId: null, icon: '🪐' });
         }
 
         let currentParentId = categoryMap.get(mainCatName)!;
@@ -68,12 +63,7 @@ export const storageService = {
           if (!categoryMap.has(subKey)) {
             const subId = `sub-${subKey.replace(/\s+/g, '-')}`;
             categoryMap.set(subKey, subId);
-            categories.push({
-              id: subId,
-              name: subCatName,
-              parentId: currentParentId,
-              icon: '📚'
-            });
+            categories.push({ id: subId, name: subCatName, parentId: currentParentId, icon: '📚' });
           }
           currentParentId = categoryMap.get(subKey)!;
         }
@@ -81,7 +71,7 @@ export const storageService = {
         documents.push({
           id: row.id,
           title: row.title,
-          description: `Archive classée en ${mainCatName}${subCatName ? ' > ' + subCatName : ''}`,
+          description: `Archive classée en ${mainCatName}${subCatName ? ' &gt; ' + subCatName : ''}`,
           categoryId: currentParentId,
           fileUrl: storageService.optimizeDriveUrl(row.url),
           fileType: 'pdf',
@@ -116,19 +106,28 @@ export const storageService = {
     return url;
   },
 
-  // GESTION DE L'IDENTITÉ UTILISATEUR
   saveUserEmail: (email: string) => localStorage.setItem(KEYS.USER_EMAIL, email),
   getUserEmail: () => localStorage.getItem(KEYS.USER_EMAIL),
 
-  // ENVOI DES LOGS CLOUD (Arrière-plan discret)
-  sendToCloudLog: async (email: string, fileName: string, action: string = 'Téléchargement') => {
-    const payload = {
-      email,
-      action,
-      fichier: fileName,
-      timestamp: new Date().toLocaleString('fr-FR')
-    };
+  banEmail: (email: string) => {
+    const list = storageService.getBannedEmails();
+    if (!list.includes(email)) {
+      localStorage.setItem(KEYS.BANNED_EMAILS, JSON.stringify([...list, email]));
+      storageService.addLog('BAN', `Bannissement de ${email}`);
+    }
+  },
 
+  unbanEmail: (email: string) => {
+    const list = storageService.getBannedEmails().filter(e => e !== email);
+    localStorage.setItem(KEYS.BANNED_EMAILS, JSON.stringify(list));
+    storageService.addLog('BAN', `Réactivation de ${email}`);
+  },
+
+  getBannedEmails: (): string[] => JSON.parse(localStorage.getItem(KEYS.BANNED_EMAILS) || '[]'),
+  isEmailBanned: (email: string): boolean => storageService.getBannedEmails().includes(email),
+
+  sendToCloudLog: async (email: string, fileName: string, action: string = 'Téléchargement') => {
+    const payload = { email, action, fichier: fileName, timestamp: new Date().toLocaleString('fr-FR') };
     try {
       fetch(APPS_SCRIPT_WEBHOOK_URL, {
         method: 'POST',
@@ -137,7 +136,7 @@ export const storageService = {
         body: JSON.stringify(payload)
       });
     } catch (e) {
-      console.warn("Échec du traçage cloud (silencieux)");
+      console.warn("Tracking cloud off");
     }
   },
 
@@ -145,8 +144,8 @@ export const storageService = {
     const data = localStorage.getItem(KEYS.ACCOUNTS);
     if (!data) {
       const defaults: AdminAccount[] = [
-        { id: '1', username: 'Léon', role: 'MASTER', lastLogin: '' },
-        { id: '0', username: 'Astarté', role: 'SUPER_MASTER', lastLogin: '' }
+        { id: '0', username: 'Astarté', role: 'SUPER_MASTER', lastLogin: '' },
+        { id: '1', username: 'Léon', role: 'MASTER', lastLogin: '' }
       ];
       localStorage.setItem(KEYS.ACCOUNTS, JSON.stringify(defaults));
       return defaults;

@@ -49,7 +49,7 @@ export interface Stats {
 
 export interface ActivityLog {
   id: string;
-  action: 'AUTH' | 'SYSTEM' | 'UPLOAD' | 'DELETE' | 'CONFIG' | 'TRAÇAGE' | 'ACCOUNT';
+  action: 'AUTH' | 'SYSTEM' | 'UPLOAD' | 'DELETE' | 'CONFIG' | 'TRAÇAGE' | 'ACCOUNT' | 'BAN';
   timestamp: string;
   details: string;
 }
