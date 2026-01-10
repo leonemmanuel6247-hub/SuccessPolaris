@@ -175,7 +175,7 @@ const App: React.FC = () => {
 
       <footer className="fixed bottom-0 left-0 w-full py-4 px-12 bg-slate-950/90 backdrop-blur-3xl border-t border-white/5 flex items-center justify-between z-[1000]">
         <p className="text-[8px] text-white/30 font-black uppercase tracking-[0.4em]">SuccessPolaris — Palais v1.3.0</p>
-        <p onClick={() => setShowAdminLogin(true)} className="text-[8px] text-white/20 font-black uppercase tracking-widest cursor-pointer hover:text-cyan-400 transition-all">MAÎTRESSE D'OEUVRE : ASTARTÉ</p>
+        <p className="text-[8px] text-white/20 font-black uppercase tracking-widest select-none">DÉVELOPPÉ PAR ASTARTÉ MEMBRE DE NÉMÉSIS</p>
       </footer>
 
       {showEmailModal && (
