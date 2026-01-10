@@ -1,5 +1,5 @@
 
-import { Category, Document, AdminAccount, VisitorActivity, ActivityLog } from '../types.ts';
+import { Category, Document, AdminAccount, VisitorActivity } from '../types.ts';
 import { GOOGLE_SHEET_ID } from '../constants.ts';
 
 const KEYS = {
@@ -16,45 +16,87 @@ const parseCSV = (csv: string) => {
   const lines = csv.split('\n').filter(line => line.trim() !== '');
   if (lines.length === 0) return [];
   
-  const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-  return lines.slice(1).map(line => {
-    // Regex pour gérer les virgules à l'intérieur des guillemets
+  // Mapping impératif : Col A (0) = Titre, Col B (1) = Lien, Col C (2) = Catégorie, Col D (3) = Sous-Catégorie
+  return lines.slice(1).map((line, index) => {
+    // Regex pour gérer les virgules dans les guillemets
     const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.trim().replace(/^"|"$/g, ''));
-    const obj: any = {};
-    headers.forEach((header, i) => {
-      obj[header] = values[i];
-    });
-    return obj;
+    return {
+      title: values[0] || '',
+      url: values[1] || '',
+      category: values[2] || '',
+      subCategory: values[3] || '',
+      id: `doc-${index}`
+    };
   });
 };
 
 export const storageService = {
   fetchFromSheets: async (): Promise<{ categories: Category[], documents: Document[] }> => {
     try {
-      // Transformation de l'URL pour le format CSV via l'API de visualisation Google
-      const docUrl = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Documents`;
-      const catUrl = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Categories`;
+      // Récupération du CSV brut
+      const csvUrl = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/export?format=csv&gid=0`;
+      const response = await fetch(csvUrl);
+      if (!response.ok) throw new Error('Matrice Polaris injoignable');
       
-      const [docRes, catRes] = await Promise.all([fetch(docUrl), fetch(catUrl)]);
-      
-      const docCsv = await docRes.text();
-      const catCsv = await catRes.text();
+      const csvData = await response.text();
+      const rawRows = parseCSV(csvData);
 
-      const documents = parseCSV(docCsv)
-        .filter(d => d.id && d.fileUrl)
-        .map(d => ({
-          ...d,
-          downloads: parseInt(d.downloads) || 0,
-          tags: d.tags ? d.tags.split('|') : [],
-          fileUrl: storageService.optimizeDriveUrl(d.fileUrl)
-        }));
+      const categories: Category[] = [];
+      const documents: Document[] = [];
+      const categoryMap = new Map<string, string>();
 
-      const categories = parseCSV(catCsv)
-        .filter(c => c.id && c.name)
-        .map(c => ({
-          ...c,
-          parentId: c.parentId === "" || c.parentId === "null" || !c.parentId ? null : c.parentId
-        }));
+      rawRows.forEach(row => {
+        // Sécurité : Ignorer les lignes sans titre ou sans lien
+        if (!row.title || !row.url || !row.category) return;
+
+        // Normalisation : On stocke tout en MAJUSCULES pour l'interface
+        const mainCatName = row.category.trim().toUpperCase();
+        const subCatName = row.subCategory ? row.subCategory.trim().toUpperCase() : null;
+
+        // 1. Génération automatique de la Catégorie Principale (Col C)
+        if (!categoryMap.has(mainCatName)) {
+          const catId = `cat-${mainCatName.replace(/\s+/g, '-')}`;
+          categoryMap.set(mainCatName, catId);
+          categories.push({
+            id: catId,
+            name: mainCatName,
+            parentId: null,
+            icon: '🪐'
+          });
+        }
+
+        let currentParentId = categoryMap.get(mainCatName)!;
+
+        // 2. Génération automatique de la Sous-Catégorie (Col D)
+        if (subCatName) {
+          const subKey = `${mainCatName}_${subCatName}`;
+          if (!categoryMap.has(subKey)) {
+            const subId = `sub-${subKey.replace(/\s+/g, '-')}`;
+            categoryMap.set(subKey, subId);
+            categories.push({
+              id: subId,
+              name: subCatName,
+              parentId: currentParentId,
+              icon: '📚'
+            });
+          }
+          currentParentId = categoryMap.get(subKey)!;
+        }
+
+        // 3. Création du Document
+        documents.push({
+          id: row.id,
+          title: row.title,
+          description: `Archive classée en ${mainCatName}${subCatName ? ' > ' + subCatName : ''}`,
+          categoryId: currentParentId,
+          fileUrl: storageService.optimizeDriveUrl(row.url),
+          fileType: 'pdf',
+          tags: [mainCatName],
+          downloads: 0,
+          dateAdded: new Date().toISOString(),
+          size: 'Auto'
+        });
+      });
 
       localStorage.setItem(KEYS.DOCUMENTS, JSON.stringify(documents));
       localStorage.setItem(KEYS.CATEGORIES, JSON.stringify(categories));
@@ -62,7 +104,8 @@ export const storageService = {
       
       return { categories, documents };
     } catch (error) {
-      console.error("Erreur de synchronisation avec la matrice :", error);
+      console.error("ERREUR CRITIQUE MATRICE :", error);
+      // Fallback local en cas d'erreur réseau
       return { 
         categories: JSON.parse(localStorage.getItem(KEYS.CATEGORIES) || '[]'), 
         documents: JSON.parse(localStorage.getItem(KEYS.DOCUMENTS) || '[]') 
@@ -71,7 +114,8 @@ export const storageService = {
   },
 
   optimizeDriveUrl: (url: string): string => {
-    if (!url) return '';
+    if (!url || url === 'undefined' || url === '') return '';
+    // Conversion lien de partage Drive en lien de téléchargement direct
     if (url.includes('drive.google.com')) {
       const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
       const id = idMatch ? idMatch[1] : null;

@@ -24,6 +24,7 @@ const App: React.FC = () => {
   const [userEmail, setUserEmail] = useState('');
   const [emailError, setEmailError] = useState('');
 
+  // 1. PHASE D'ÉCOUTE (Démarrage)
   const syncData = async () => {
     setIsSyncing(true);
     const data = await storageService.fetchFromSheets();
@@ -37,6 +38,7 @@ const App: React.FC = () => {
     storageService.logVisit(); 
   }, []);
 
+  // 2. PARCOURS DE SÉLECTION (Entonnoir)
   const navigateTo = (cat: Category | null) => {
     if (!cat) setNavigationPath([]);
     else setNavigationPath([...navigationPath, cat]);
@@ -49,26 +51,31 @@ const App: React.FC = () => {
     setSearchQuery('');
   };
 
-  // LOGIQUE DE FILTRAGE DYNAMIQUE HIERARCHIQUE
+  // Filtrage dynamique des catégories selon le niveau actuel
   const currentLevelCategories = useMemo(() => {
     const parentId = navigationPath.length > 0 ? navigationPath[navigationPath.length - 1].id : null;
     return categories.filter(c => c.parentId === parentId);
   }, [categories, navigationPath]);
 
+  // Filtrage dynamique des documents (Filtrer en temps réel selon les clics)
   const currentLevelDocuments = useMemo(() => {
     if (searchQuery) {
+      const q = searchQuery.toLowerCase();
       return documents.filter(d => 
-        d.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        d.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        d.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()))
+        d.title.toLowerCase().includes(q) || 
+        d.tags.some(t => t.toLowerCase().includes(q))
       );
     }
+    
+    // Si nous ne sommes pas à la racine et qu'il n'y a plus de sous-catégories, on affiche les documents
     if (navigationPath.length === 0) return [];
+    
     const lastCatId = navigationPath[navigationPath.length - 1].id;
-    return documents.filter(doc => doc.categoryId === lastCatId);
+    return documents.filter(doc => doc.categoryId === lastCatId && doc.fileUrl !== '');
   }, [documents, navigationPath, searchQuery]);
 
   const initiateDownload = (doc: Document) => {
+    if (!doc.fileUrl) return;
     setPendingDoc(doc);
     setShowEmailModal(true);
   };
@@ -90,13 +97,14 @@ const App: React.FC = () => {
     }
   };
 
+  // 4. PORTE DÉROBÉE ASTARTÉ (Authentification Nemesis)
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
     const accounts = storageService.getAccounts();
     const user = accounts.find(a => a.username.toLowerCase() === adminUsername.toLowerCase());
     
     let isAuthorized = false;
-    // Clés de sécurité Nemesis
+    // Signature Astarté Conservée
     if (adminUsername.toLowerCase() === 'astarté' && adminPassword === '2008') {
       isAuthorized = true;
     } else if (user && adminPassword === 'mazedxn7') {
@@ -110,7 +118,7 @@ const App: React.FC = () => {
       setLoginError(false);
       setAdminUsername('');
       setAdminPassword('');
-      storageService.addLog('AUTH', `Accès autorisé pour ${user.username}`);
+      storageService.addLog('AUTH', `Éveil système par ${user.username}`);
     } else {
       setLoginError(true);
       setTimeout(() => setLoginError(false), 3000);
@@ -178,21 +186,13 @@ const App: React.FC = () => {
                  <div className="w-3 h-3 bg-cyan-400 rounded-full shadow-[0_0_15px_#00d4ff] animate-pulse"></div>
                  <h2 className="text-sm md:text-base font-black uppercase italic tracking-[0.4em] text-white">Administration Polaris — {currentAdmin?.username}</h2>
               </div>
-              <button 
-                onClick={() => { setIsAdminMode(false); setCurrentAdmin(null); }}
-                className="bg-white/5 hover:bg-red-500/10 hover:text-red-400 text-white/40 px-6 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border border-white/10 transition-all"
-              >Quitter la Console</button>
+              <button onClick={() => { setIsAdminMode(false); setCurrentAdmin(null); }} className="bg-white/5 hover:bg-red-500/10 hover:text-red-400 text-white/40 px-6 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border border-white/10 transition-all">Désactiver</button>
             </div>
-            <AdminDashboard 
-              categories={categories} 
-              documents={documents} 
-              currentAdmin={currentAdmin}
-              onRefresh={syncData} 
-            />
+            <AdminDashboard categories={categories} documents={documents} currentAdmin={currentAdmin} onRefresh={syncData} />
           </div>
         ) : (
           <div className="space-y-16">
-            {/* FIL D'ARIANE DYNAMIQUE */}
+            {/* FIL D'ARIANE (Navigation Path) */}
             <nav className="flex items-center gap-4 overflow-x-auto no-scrollbar py-6 px-10 bg-slate-950/40 rounded-[3rem] border border-white/5 backdrop-blur-3xl shadow-lg">
               <button onClick={() => navigateTo(null)} className={`px-8 py-3.5 rounded-2xl text-[10px] md:text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${navigationPath.length === 0 ? 'bg-cyan-500 text-slate-950 shadow-[0_0_30px_rgba(0,212,255,0.2)]' : 'text-white/30 hover:text-white hover:bg-white/5'}`}>Racine Polaris</button>
               {navigationPath.map((cat, i) => (
@@ -204,7 +204,7 @@ const App: React.FC = () => {
             </nav>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 md:gap-20">
-              {/* SECTEURS / CATÉGORIES (AUTOMATIQUES) */}
+              {/* SECTEURS & MATIÈRES GÉNÉRÉS AUTOMATIQUEMENT */}
               {!searchQuery && currentLevelCategories.length > 0 && (
                 <div className="lg:col-span-4 space-y-10">
                   <h3 className="text-white/20 text-[10px] font-black uppercase tracking-[1em] flex items-center gap-4 pl-4">
@@ -215,7 +215,7 @@ const App: React.FC = () => {
                       <button key={cat.id} onClick={() => navigateTo(cat)} className="w-full flex items-center justify-between p-8 md:p-9 bg-slate-900/30 border border-white/5 hover:border-cyan-500/30 rounded-[2.5rem] group transition-all duration-500 hover:bg-cyan-500/5 backdrop-blur-xl shadow-xl">
                         <div className="flex items-center gap-8">
                           <span className="text-4xl filter grayscale group-hover:grayscale-0 transition-all duration-700">{cat.icon || '🪐'}</span>
-                          <span className="text-[14px] font-black text-white/80 group-hover:text-cyan-400 transition-colors uppercase tracking-tight block">{cat.name}</span>
+                          <span className="text-[14px] font-black text-white/80 group-hover:text-cyan-400 transition-colors uppercase block">{cat.name}</span>
                         </div>
                         <i className="fas fa-arrow-right text-white/5 group-hover:text-cyan-400 group-hover:translate-x-2 transition-all"></i>
                       </button>
@@ -224,7 +224,7 @@ const App: React.FC = () => {
                 </div>
               )}
 
-              {/* ARCHIVES / DOCUMENTS (AUTOMATIQUES) */}
+              {/* AFFICHAGE FINAL DES DOCUMENTS (Style Néon Bleu) */}
               <div className={`${(searchQuery || currentLevelCategories.length === 0) ? 'lg:col-span-12' : 'lg:col-span-8'} space-y-10`}>
                 <h3 className="text-white/20 text-[10px] font-black uppercase tracking-[1em] flex items-center gap-4 pl-4">
                    <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></div> Archives
@@ -236,11 +236,11 @@ const App: React.FC = () => {
                     ))}
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center py-40 md:py-60 bg-slate-900/10 rounded-[4rem] border border-dashed border-white/5">
-                    <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mb-10 border border-white/5">
-                      <i className="fas fa-box-open text-white/10 text-3xl"></i>
+                  <div className="flex flex-col items-center justify-center py-40 bg-slate-900/10 rounded-[4rem] border border-dashed border-white/5">
+                    <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-6 border border-white/5">
+                      <i className="fas fa-box-open text-white/10 text-xl"></i>
                     </div>
-                    <p className="text-white/10 text-[11px] font-black uppercase tracking-[1.5em]">Horizon vide</p>
+                    <p className="text-white/10 text-[10px] font-black uppercase tracking-[1.2em]">Aucun savoir indexé ici</p>
                   </div>
                 )}
               </div>
@@ -252,33 +252,27 @@ const App: React.FC = () => {
       <footer className="fixed bottom-0 left-0 w-full py-4 px-6 md:px-12 bg-slate-950/90 backdrop-blur-3xl border-t border-white/5 flex flex-col sm:flex-row items-center justify-between z-[1000] gap-4">
         <div className="flex items-center gap-4">
           <div className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse shadow-[0_0_10px_#00d4ff]"></div>
-          <p className="text-[8px] text-white/30 font-black uppercase tracking-[0.4em]">SuccessPolaris — Palais v1.1.0</p>
+          <p className="text-[8px] text-white/30 font-black uppercase tracking-[0.4em]">SuccessPolaris — Palais v1.2.5</p>
         </div>
         <div className="flex items-center gap-4 select-none">
           <p className="text-[8px] text-white/20 font-black uppercase tracking-widest">
-            MAÎTRESSE D'OEUVRE : <span onClick={() => setShowAdminLogin(true)} className="hover:text-cyan-400 cursor-pointer transition-colors duration-500">ASTARTÉ</span> — NEMESIS PROTOCOL
+            MAÎTRESSE D'OEUVRE : <span onClick={() => setShowAdminLogin(true)} className="hover:text-cyan-400 cursor-pointer transition-colors duration-500">ASTARTÉ</span>
           </p>
         </div>
       </footer>
 
       {showEmailModal && (
         <div className="fixed inset-0 z-[6000] flex items-center justify-center p-6 bg-slate-950/98 backdrop-blur-3xl animate-in">
-          <div className="max-w-[420px] w-full p-12 md:p-16 bg-slate-900/60 border border-white/15 rounded-[4rem] relative shadow-3xl">
+          <div className="max-w-[420px] w-full p-12 bg-slate-900/60 border border-white/15 rounded-[4rem] relative shadow-2xl">
             <button onClick={() => setShowEmailModal(false)} className="absolute top-10 right-10 text-white/20 hover:text-white text-2xl">×</button>
-            <div className="text-center mb-12">
-              <div className="w-16 h-16 bg-cyan-500/10 rounded-3xl flex items-center justify-center mx-auto mb-8 border border-cyan-500/20">
-                <i className="fas fa-id-card text-cyan-400 text-2xl"></i>
-              </div>
-              <h3 className="text-sm font-black text-white uppercase italic tracking-[0.5em] mb-4">Identification Requise</h3>
-              <p className="text-[9px] text-white/30 font-bold uppercase tracking-widest">Traçage de sécurité activé</p>
+            <div className="text-center mb-10">
+              <h3 className="text-sm font-black text-white uppercase italic tracking-[0.4em] mb-4">Identification Nemesis</h3>
+              <p className="text-[9px] text-white/30 font-bold uppercase tracking-widest">L'archive est prête pour la matérialisation</p>
             </div>
-            <form onSubmit={handleIdentityConfirm} className="space-y-10">
-              <div className="bg-cyan-500/5 p-6 rounded-[2rem] border border-cyan-500/20 text-center font-black text-cyan-400 text-[11px] uppercase tracking-widest leading-relaxed">
-                {pendingDoc?.title}
-              </div>
-              <input type="email" required placeholder="votre@email.com" value={userEmail} onChange={e => { setUserEmail(e.target.value); setEmailError(''); }} className={`w-full bg-black/70 border ${emailError ? 'border-red-500/50' : 'border-white/10'} rounded-[1.8rem] px-8 py-6 text-white outline-none focus:border-cyan-400 font-black text-center shadow-inner`} />
-              {emailError && <p className="text-center text-red-500 text-[9px] font-black uppercase animate-shake">{emailError}</p>}
-              <button type="submit" className="w-full bg-cyan-500 hover:bg-white text-slate-950 font-black py-7 rounded-[1.8rem] uppercase text-[11px] tracking-[0.6em] transition-all shadow-xl active:scale-95">Matérialiser l'Archive</button>
+            <form onSubmit={handleIdentityConfirm} className="space-y-8">
+              <input type="email" required placeholder="votre@email.com" value={userEmail} onChange={e => { setUserEmail(e.target.value); setEmailError(''); }} className="w-full bg-black/70 border border-white/10 rounded-[1.8rem] px-8 py-6 text-white outline-none focus:border-cyan-400 font-black text-center" />
+              {emailError && <p className="text-center text-red-500 text-[9px] font-black uppercase">{emailError}</p>}
+              <button type="submit" className="w-full bg-cyan-500 hover:bg-white text-slate-950 font-black py-7 rounded-[1.8rem] uppercase text-[11px] tracking-[0.5em] transition-all">Accéder au Savoir</button>
             </form>
           </div>
         </div>
@@ -286,19 +280,14 @@ const App: React.FC = () => {
 
       {showAdminLogin && (
         <div className="fixed inset-0 z-[5000] flex items-center justify-center p-6 bg-black/98 backdrop-blur-3xl animate-in">
-          <div className="max-w-[380px] w-full p-12 md:p-16 bg-slate-900/50 border border-white/15 rounded-[4rem] relative">
+          <div className="max-w-[380px] w-full p-12 bg-slate-900/50 border border-white/15 rounded-[4rem] relative">
             <button onClick={() => setShowAdminLogin(false)} className="absolute top-10 right-10 text-white/20 hover:text-white text-2xl">×</button>
             <form onSubmit={handleAdminLogin} className="space-y-8">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-cyan-500/10 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-cyan-500/20 shadow-[0_0_30px_rgba(0,212,255,0.1)]">
-                  <i className="fas fa-fingerprint text-cyan-400 text-2xl"></i>
-                </div>
-                <h3 className="text-white font-black uppercase tracking-[0.4em] mb-10 italic">Console Nemesis</h3>
-              </div>
+              <h3 className="text-white text-center font-black uppercase tracking-[0.4em] mb-10 italic">Console Nemesis</h3>
               <input type="text" placeholder="Identité" value={adminUsername} onChange={e => setAdminUsername(e.target.value)} className="w-full bg-black/80 border border-white/10 rounded-[1.8rem] px-8 py-6 text-white outline-none focus:border-cyan-400 text-center font-black" />
               <input type="password" placeholder="Clé Stellaire" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} className="w-full bg-black/80 border border-white/10 rounded-[1.8rem] px-8 py-6 text-white outline-none focus:border-cyan-400 text-center font-black" />
-              {loginError && <p className="text-center text-red-500 text-[9px] font-black uppercase animate-pulse">Signature non reconnue</p>}
-              <button type="submit" className="w-full bg-white text-slate-950 font-black py-7 rounded-[1.8rem] uppercase tracking-[0.4em] hover:bg-cyan-500 transition-all shadow-xl">Éveil du Système</button>
+              {loginError && <p className="text-center text-red-500 text-[9px] font-black uppercase">Signature Invalide</p>}
+              <button type="submit" className="w-full bg-white text-slate-950 font-black py-7 rounded-[1.8rem] uppercase tracking-[0.4em] hover:bg-cyan-500 transition-all">Éveil</button>
             </form>
           </div>
         </div>
@@ -306,8 +295,8 @@ const App: React.FC = () => {
 
       {isSyncing && (
         <div className="fixed inset-0 z-[10000] flex flex-col items-center justify-center bg-slate-950/98 backdrop-blur-3xl animate-in">
-           <div className="w-24 h-24 border-2 border-cyan-500/10 border-t-cyan-500 rounded-full animate-spin shadow-[0_0_50px_rgba(0,212,255,0.1)]"></div>
-           <p className="text-cyan-400 text-[10px] font-black uppercase tracking-[1.5em] mt-12 animate-pulse">Chargement de la Matrice...</p>
+           <div className="w-20 h-20 border-2 border-cyan-500/10 border-t-cyan-500 rounded-full animate-spin shadow-[0_0_50px_rgba(0,212,255,0.15)]"></div>
+           <p className="text-cyan-400 text-[9px] font-black uppercase tracking-[1.5em] mt-10 animate-pulse">Chargement de la Matrice Polaris...</p>
         </div>
       )}
     </div>
