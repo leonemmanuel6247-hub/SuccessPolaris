@@ -11,8 +11,8 @@ export const THEME = {
 };
 
 // --- CONFIGURATION DYNAMIQUE ---
-// REMPLACE CET ID PAR CELUI DE TA FEUILLE GOOGLE SHEETS PUBLIÉE
-export const GOOGLE_SHEET_ID = '1XpY_vOTRE_ID_ICI'; 
+// ID Google Sheets réel fourni par l'utilisateur
+export const GOOGLE_SHEET_ID = '1fg-tStXc8E04WLqkHxDfrEJR7yf6ix0uzL4y52HF0k0'; 
 
 export const INITIAL_CATEGORIES: Category[] = [];
 export const INITIAL_DOCUMENTS: Document[] = [];

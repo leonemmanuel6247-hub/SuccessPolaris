@@ -1,6 +1,6 @@
 
 import { Category, Document, AdminAccount, VisitorActivity, ActivityLog } from '../types.ts';
-import { INITIAL_CATEGORIES, INITIAL_DOCUMENTS, GOOGLE_SHEET_ID } from '../constants.ts';
+import { GOOGLE_SHEET_ID } from '../constants.ts';
 
 const KEYS = {
   CATEGORIES: 'sp_categories',
@@ -13,11 +13,13 @@ const KEYS = {
 };
 
 const parseCSV = (csv: string) => {
-  const lines = csv.split('\n');
+  const lines = csv.split('\n').filter(line => line.trim() !== '');
   if (lines.length === 0) return [];
+  
   const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
   return lines.slice(1).map(line => {
-    const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.trim().replace(/"/g, ''));
+    // Regex pour gérer les virgules à l'intérieur des guillemets
+    const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.trim().replace(/^"|"$/g, ''));
     const obj: any = {};
     headers.forEach((header, i) => {
       obj[header] = values[i];
@@ -29,23 +31,30 @@ const parseCSV = (csv: string) => {
 export const storageService = {
   fetchFromSheets: async (): Promise<{ categories: Category[], documents: Document[] }> => {
     try {
-      const docResponse = await fetch(`https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Documents`);
-      const catResponse = await fetch(`https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Categories`);
+      // Transformation de l'URL pour le format CSV via l'API de visualisation Google
+      const docUrl = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Documents`;
+      const catUrl = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Categories`;
       
-      const docCsv = await docResponse.text();
-      const catCsv = await catResponse.text();
+      const [docRes, catRes] = await Promise.all([fetch(docUrl), fetch(catUrl)]);
+      
+      const docCsv = await docRes.text();
+      const catCsv = await catRes.text();
 
-      const documents = parseCSV(docCsv).filter(d => d.id).map(d => ({
-        ...d,
-        downloads: parseInt(d.downloads) || 0,
-        tags: d.tags ? d.tags.split('|') : [],
-        fileUrl: storageService.optimizeDriveUrl(d.fileUrl)
-      }));
+      const documents = parseCSV(docCsv)
+        .filter(d => d.id && d.fileUrl)
+        .map(d => ({
+          ...d,
+          downloads: parseInt(d.downloads) || 0,
+          tags: d.tags ? d.tags.split('|') : [],
+          fileUrl: storageService.optimizeDriveUrl(d.fileUrl)
+        }));
 
-      const categories = parseCSV(catCsv).filter(c => c.id).map(c => ({
-        ...c,
-        parentId: c.parentId === "" || c.parentId === "null" || !c.parentId ? null : c.parentId
-      }));
+      const categories = parseCSV(catCsv)
+        .filter(c => c.id && c.name)
+        .map(c => ({
+          ...c,
+          parentId: c.parentId === "" || c.parentId === "null" || !c.parentId ? null : c.parentId
+        }));
 
       localStorage.setItem(KEYS.DOCUMENTS, JSON.stringify(documents));
       localStorage.setItem(KEYS.CATEGORIES, JSON.stringify(categories));
@@ -53,7 +62,7 @@ export const storageService = {
       
       return { categories, documents };
     } catch (error) {
-      console.error("Erreur Sync:", error);
+      console.error("Erreur de synchronisation avec la matrice :", error);
       return { 
         categories: JSON.parse(localStorage.getItem(KEYS.CATEGORIES) || '[]'), 
         documents: JSON.parse(localStorage.getItem(KEYS.DOCUMENTS) || '[]') 
@@ -62,6 +71,7 @@ export const storageService = {
   },
 
   optimizeDriveUrl: (url: string): string => {
+    if (!url) return '';
     if (url.includes('drive.google.com')) {
       const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
       const id = idMatch ? idMatch[1] : null;
