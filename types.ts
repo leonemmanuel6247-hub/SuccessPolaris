@@ -9,7 +9,7 @@ export interface Category {
 export interface AdminAccount {
   id: string;
   username: string;
-  role: 'MASTER' | 'EDITOR';
+  role: 'SUPER_MASTER' | 'MASTER' | 'EDITOR';
   lastLogin: string;
 }
 

@@ -4,7 +4,7 @@ import AuroraBackground from './components/AuroraBackground.tsx';
 import DocumentCard from './components/DocumentCard.tsx';
 import AdminDashboard from './components/AdminDashboard.tsx';
 import { storageService } from './services/storageService.ts';
-import { Category, Document } from './types.ts';
+import { Category, Document, AdminAccount } from './types.ts';
 
 const App: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -12,6 +12,7 @@ const App: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [navigationPath, setNavigationPath] = useState<Category[]>([]);
   const [isAdminMode, setIsAdminMode] = useState(false);
+  const [currentAdmin, setCurrentAdmin] = useState<AdminAccount | null>(null);
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [adminUsername, setAdminUsername] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
@@ -90,13 +91,22 @@ const App: React.FC = () => {
     const accounts = storageService.getAccounts();
     const user = accounts.find(a => a.username.toLowerCase() === adminUsername.toLowerCase());
     
-    if (user && adminPassword === 'mazedxn7') {
+    let isAuthorized = false;
+    // Clé Léon: mazedxn7, Clé Astarté: 2008
+    if (adminUsername.toLowerCase() === 'astarté' && adminPassword === '2008') {
+      isAuthorized = true;
+    } else if (user && adminPassword === 'mazedxn7') {
+      isAuthorized = true;
+    }
+    
+    if (isAuthorized && user) {
       setIsAdminMode(true);
+      setCurrentAdmin(user);
       setShowAdminLogin(false);
       setLoginError(false);
       setAdminUsername('');
       setAdminPassword('');
-      storageService.addLog('AUTH', `Accès autorisé pour ${user.username}`);
+      storageService.addLog('AUTH', `Éveil du système par ${user.username}`);
     } else {
       setLoginError(true);
       setTimeout(() => setLoginError(false), 3000);
@@ -155,37 +165,32 @@ const App: React.FC = () => {
 
       <main className="container mx-auto px-6 md:px-12 lg:px-24 relative z-10">
         {isAdminMode ? (
-          <div className="space-y-12">
+          <div className="space-y-12 animate-in">
             <div className="flex justify-between items-center mb-12 border-b border-white/5 pb-8">
               <div className="flex items-center gap-6">
                  <div className="w-4 h-4 bg-cyan-400 rounded-full shadow-[0_0_25px_#00d4ff] animate-pulse"></div>
-                 <h2 className="text-lg md:text-xl font-black uppercase italic tracking-[0.4em] text-white">Console de Contrôle Polaris</h2>
+                 <h2 className="text-lg md:text-xl font-black uppercase italic tracking-[0.4em] text-white">Console Polaris — {currentAdmin?.username}</h2>
               </div>
               <button 
-                onClick={() => setIsAdminMode(false)}
-                className="bg-white/5 hover:bg-red-500/20 hover:text-red-400 text-white/40 px-8 py-3 rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest border border-white/10 transition-all shadow-xl"
-              >Quitter</button>
+                onClick={() => { setIsAdminMode(false); setCurrentAdmin(null); }}
+                className="bg-white/5 hover:bg-red-500/20 hover:text-red-400 text-white/40 px-8 py-3 rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest border border-white/10 transition-all"
+              >Mettre en Veille</button>
             </div>
             <AdminDashboard 
               categories={categories} 
               documents={documents} 
+              currentAdmin={currentAdmin}
               onRefresh={syncData} 
             />
           </div>
         ) : (
           <div className="space-y-16 md:space-y-24">
-            <nav className="flex items-center gap-3 md:gap-5 overflow-x-auto no-scrollbar py-4 md:py-6 px-6 md:px-10 bg-slate-950/60 rounded-[2.5rem] md:rounded-[3rem] border border-white/5 backdrop-blur-3xl shadow-2xl">
-              <button 
-                onClick={() => navigateTo(null)}
-                className={`px-8 md:px-12 py-3 md:py-4 rounded-[1.2rem] md:rounded-[1.5rem] text-[10px] md:text-[12px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${navigationPath.length === 0 ? 'bg-cyan-400 text-slate-950 shadow-[0_0_30px_rgba(0,212,255,0.4)]' : 'text-white/20 hover:text-white'}`}
-              >Racine Polaris</button>
+            <nav className="flex items-center gap-3 md:gap-5 overflow-x-auto no-scrollbar py-4 md:py-6 px-6 md:px-10 bg-slate-950/60 rounded-[2.5rem] md:rounded-[3rem] border border-white/5 backdrop-blur-3xl">
+              <button onClick={() => navigateTo(null)} className={`px-8 md:px-12 py-3 md:py-4 rounded-[1.2rem] md:rounded-[1.5rem] text-[10px] md:text-[12px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${navigationPath.length === 0 ? 'bg-cyan-400 text-slate-950' : 'text-white/20 hover:text-white'}`}>Racine Polaris</button>
               {navigationPath.map((cat, i) => (
                 <React.Fragment key={cat.id}>
                   <div className="w-1.5 h-1.5 bg-cyan-400/20 rounded-full shrink-0"></div>
-                  <button 
-                    onClick={() => goBackTo(i)}
-                    className={`px-8 md:px-12 py-3 md:py-4 rounded-[1.2rem] md:rounded-[1.5rem] text-[10px] md:text-[12px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${i === navigationPath.length - 1 ? 'bg-white text-slate-950' : 'text-white/20 hover:text-white'}`}
-                  >{cat.name}</button>
+                  <button onClick={() => goBackTo(i)} className={`px-8 md:px-12 py-3 md:py-4 rounded-[1.2rem] md:rounded-[1.5rem] text-[10px] md:text-[12px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${i === navigationPath.length - 1 ? 'bg-white text-slate-950' : 'text-white/20 hover:text-white'}`}>{cat.name}</button>
                 </React.Fragment>
               ))}
             </nav>
@@ -198,13 +203,9 @@ const App: React.FC = () => {
                   </h3>
                   <div className="grid grid-cols-1 gap-4 md:gap-6">
                     {currentLevelCategories.map(cat => (
-                      <button 
-                        key={cat.id}
-                        onClick={() => navigateTo(cat)}
-                        className="w-full flex items-center justify-between p-8 md:p-10 bg-slate-900/40 border border-white/5 hover:border-cyan-500/40 rounded-[2.5rem] group transition-all duration-700 hover:bg-cyan-500/5 hover:-translate-y-2 backdrop-blur-md"
-                      >
+                      <button key={cat.id} onClick={() => navigateTo(cat)} className="w-full flex items-center justify-between p-8 md:p-10 bg-slate-900/40 border border-white/5 hover:border-cyan-500/40 rounded-[2.5rem] group transition-all duration-700 hover:bg-cyan-500/5 backdrop-blur-md">
                         <div className="flex items-center gap-6 md:gap-8">
-                          <span className="text-3xl opacity-50 group-hover:opacity-100 group-hover:scale-125 transition-all duration-700">{cat.icon || '🪐'}</span>
+                          <span className="text-3xl opacity-50 group-hover:opacity-100 transition-all">{cat.icon || '🪐'}</span>
                           <span className="text-[15px] font-black text-white/90 group-hover:text-cyan-400 transition-colors uppercase tracking-tighter block leading-none">{cat.name}</span>
                         </div>
                       </button>
@@ -224,8 +225,8 @@ const App: React.FC = () => {
                     ))}
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center py-32 md:py-48 bg-slate-900/10 rounded-[4rem] md:rounded-[5rem] border border-dashed border-white/5">
-                    <p className="text-white/10 text-[13px] font-black uppercase tracking-[1.5em] animate-pulse-slow">Horizon vide</p>
+                  <div className="flex flex-col items-center justify-center py-32 md:py-48 bg-slate-900/10 rounded-[4rem] border border-dashed border-white/5">
+                    <p className="text-white/10 text-[13px] font-black uppercase tracking-[1.5em]">Horizon vide</p>
                   </div>
                 )}
               </div>
@@ -234,8 +235,62 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {/* Footer & Modals - restent inchangés mais liés au nouveau service */}
-      {/* ... (reprise des éléments de App.tsx précédents) ... */}
+      <footer className="fixed bottom-0 left-0 w-full py-4 px-6 md:px-12 bg-slate-950/90 backdrop-blur-3xl border-t border-white/5 flex flex-col sm:flex-row items-center justify-between z-[1000] gap-4">
+        <div className="flex items-center gap-4">
+          <div className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse"></div>
+          <p className="text-[8px] md:text-[9px] text-white/30 font-black uppercase tracking-[0.4em]">SuccessPolaris — Palace v1.0.2</p>
+        </div>
+        <div className="flex items-center gap-4 select-none">
+          <p className="text-[8px] text-white/20 font-black uppercase tracking-widest">
+            CRÉÉ PAR <span onClick={() => setShowAdminLogin(true)} className="hover:text-cyan-400 cursor-pointer transition-colors duration-500">ASTARTÉ</span> — MEMBRE DE NEMESIS
+          </p>
+        </div>
+      </footer>
+
+      {showEmailModal && (
+        <div className="fixed inset-0 z-[6000] flex items-center justify-center p-6 bg-slate-950/98 backdrop-blur-3xl animate-in">
+          <div className="max-w-[420px] w-full p-12 md:p-16 bg-slate-900/60 border border-white/15 rounded-[4rem] relative shadow-3xl">
+            <button onClick={() => setShowEmailModal(false)} className="absolute top-10 right-10 text-white/20 hover:text-white text-2xl">×</button>
+            <div className="text-center mb-10">
+              <h3 className="text-md font-black text-white uppercase italic tracking-[0.5em] mb-3">Identification Requise</h3>
+              <p className="text-[9px] text-white/30 font-bold uppercase">Format d'email vérifié par Polaris</p>
+            </div>
+            <form onSubmit={handleIdentityConfirm} className="space-y-10">
+              <div className="bg-cyan-500/5 p-6 rounded-[2.5rem] border border-cyan-500/20 text-center font-black text-cyan-400">{pendingDoc?.title}</div>
+              <input type="email" required placeholder="votre@email.com" value={userEmail} onChange={e => { setUserEmail(e.target.value); setEmailError(''); }} className={`w-full bg-black/70 border ${emailError ? 'border-red-500' : 'border-white/10'} rounded-[1.5rem] px-8 py-5 text-white outline-none focus:border-cyan-400 font-black text-center`} />
+              {emailError && <p className="text-center text-red-500 text-[9px] font-black uppercase">{emailError}</p>}
+              <button type="submit" className="w-full bg-cyan-400 hover:bg-white text-slate-950 font-black py-6 rounded-[1.5rem] uppercase text-[11px] tracking-[0.5em] transition-all">Télécharger l'Archive</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showAdminLogin && (
+        <div className="fixed inset-0 z-[5000] flex items-center justify-center p-6 bg-black/98 backdrop-blur-3xl animate-in">
+          <div className="max-w-[380px] w-full p-12 md:p-16 bg-slate-900/50 border border-white/15 rounded-[4rem] relative">
+            <button onClick={() => setShowAdminLogin(false)} className="absolute top-10 right-10 text-white/20 hover:text-white text-2xl">×</button>
+            <form onSubmit={handleAdminLogin} className="space-y-8">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-cyan-500/10 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-cyan-500/20">
+                  <i className="fas fa-fingerprint text-cyan-400 text-2xl"></i>
+                </div>
+                <h3 className="text-white font-black uppercase tracking-[0.4em] mb-10 italic">Console Nemesis</h3>
+              </div>
+              <input type="text" placeholder="Utilisateur" value={adminUsername} onChange={e => setAdminUsername(e.target.value)} className="w-full bg-black/80 border border-white/10 rounded-[1.5rem] px-8 py-6 text-white outline-none focus:border-cyan-400 text-center font-black" />
+              <input type="password" placeholder="Clé Stellaire" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} className="w-full bg-black/80 border border-white/10 rounded-[1.5rem] px-8 py-6 text-white outline-none focus:border-cyan-400 text-center font-black" />
+              {loginError && <p className="text-center text-red-500 text-[9px] font-black uppercase animate-pulse">Clé Invalide</p>}
+              <button type="submit" className="w-full bg-white text-slate-950 font-black py-6 rounded-[1.5rem] uppercase tracking-widest hover:bg-cyan-400 transition-all">Éveil du Système</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isSyncing && (
+        <div className="fixed inset-0 z-[10000] flex flex-col items-center justify-center bg-slate-950/98 backdrop-blur-3xl">
+           <div className="w-20 h-20 border-4 border-cyan-500/10 border-t-cyan-500 rounded-full animate-spin"></div>
+           <p className="text-cyan-400 text-[10px] font-black uppercase tracking-[1em] mt-10 animate-pulse">Synchronisation Cloud...</p>
+        </div>
+      )}
     </div>
   );
 };

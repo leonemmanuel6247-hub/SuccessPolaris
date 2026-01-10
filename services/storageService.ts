@@ -14,6 +14,7 @@ const KEYS = {
 
 const parseCSV = (csv: string) => {
   const lines = csv.split('\n');
+  if (lines.length === 0) return [];
   const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
   return lines.slice(1).map(line => {
     const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.trim().replace(/"/g, ''));
@@ -26,12 +27,8 @@ const parseCSV = (csv: string) => {
 };
 
 export const storageService = {
-  // --- GOOGLE SHEETS SYNC ---
   fetchFromSheets: async (): Promise<{ categories: Category[], documents: Document[] }> => {
     try {
-      // On récupère les deux onglets (Documents par défaut, on peut spécifier gid pour les autres)
-      // Note: Pour faire simple, on utilise un seul onglet "Documents" pour l'instant 
-      // ou on peut faire deux appels fetch si l'utilisateur a plusieurs onglets.
       const docResponse = await fetch(`https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Documents`);
       const catResponse = await fetch(`https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Categories`);
       
@@ -47,17 +44,16 @@ export const storageService = {
 
       const categories = parseCSV(catCsv).filter(c => c.id).map(c => ({
         ...c,
-        parentId: c.parentId === "" || c.parentId === "null" ? null : c.parentId
+        parentId: c.parentId === "" || c.parentId === "null" || !c.parentId ? null : c.parentId
       }));
 
-      // Sauvegarde locale pour le mode offline / cache
       localStorage.setItem(KEYS.DOCUMENTS, JSON.stringify(documents));
       localStorage.setItem(KEYS.CATEGORIES, JSON.stringify(categories));
       localStorage.setItem(KEYS.LAST_SYNC, new Date().toISOString());
       
       return { categories, documents };
     } catch (error) {
-      console.error("Erreur de synchronisation Google Sheets:", error);
+      console.error("Erreur Sync:", error);
       return { 
         categories: JSON.parse(localStorage.getItem(KEYS.CATEGORIES) || '[]'), 
         documents: JSON.parse(localStorage.getItem(KEYS.DOCUMENTS) || '[]') 
@@ -69,76 +65,68 @@ export const storageService = {
     if (url.includes('drive.google.com')) {
       const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
       const id = idMatch ? idMatch[1] : null;
-      if (id) {
-        return `https://drive.google.com/uc?export=download&id=${id}`;
-      }
+      if (id) return `https://drive.google.com/uc?export=download&id=${id}`;
     }
     return url;
   },
 
-  // --- ACCOUNTS ---
   getAccounts: (): AdminAccount[] => {
     const data = localStorage.getItem(KEYS.ACCOUNTS);
     if (!data) {
-      const master: AdminAccount[] = [{ id: '1', username: 'Léon', role: 'MASTER', lastLogin: new Date().toLocaleString() }];
-      localStorage.setItem(KEYS.ACCOUNTS, JSON.stringify(master));
-      return master;
+      const defaults: AdminAccount[] = [
+        { id: '1', username: 'Léon', role: 'MASTER', lastLogin: '' },
+        { id: '0', username: 'Astarté', role: 'SUPER_MASTER', lastLogin: '' }
+      ];
+      localStorage.setItem(KEYS.ACCOUNTS, JSON.stringify(defaults));
+      return defaults;
     }
     return JSON.parse(data);
   },
 
-  // --- GETTERS ---
-  getCategories: (): Category[] => {
-    const data = localStorage.getItem(KEYS.CATEGORIES);
-    return data ? JSON.parse(data) : INITIAL_CATEGORIES;
+  addAccount: (username: string, role: 'MASTER' | 'EDITOR') => {
+    const accounts = storageService.getAccounts();
+    const newAcc: AdminAccount = {
+      id: Date.now().toString(),
+      username,
+      role,
+      lastLogin: 'Jamais'
+    };
+    localStorage.setItem(KEYS.ACCOUNTS, JSON.stringify([...accounts, newAcc]));
   },
 
-  getDocuments: (): Document[] => {
-    const data = localStorage.getItem(KEYS.DOCUMENTS);
-    return data ? JSON.parse(data) : INITIAL_DOCUMENTS;
+  removeAccount: (id: string) => {
+    const accounts = storageService.getAccounts().filter(a => a.id !== id);
+    localStorage.setItem(KEYS.ACCOUNTS, JSON.stringify(accounts));
   },
 
-  getLastSync: (): string => {
-    return localStorage.getItem(KEYS.LAST_SYNC) || 'Jamais';
-  },
-
+  getCategories: () => JSON.parse(localStorage.getItem(KEYS.CATEGORIES) || '[]'),
+  getDocuments: () => JSON.parse(localStorage.getItem(KEYS.DOCUMENTS) || '[]'),
+  getLastSync: () => localStorage.getItem(KEYS.LAST_SYNC) || 'Jamais',
+  
   incrementDownload: (id: string) => {
     const docs = storageService.getDocuments();
-    const docIndex = docs.findIndex(d => d.id === id);
-    if (docIndex > -1) {
-      docs[docIndex].downloads += 1;
+    const idx = docs.findIndex(d => d.id === id);
+    if (idx > -1) {
+      docs[idx].downloads += 1;
       localStorage.setItem(KEYS.DOCUMENTS, JSON.stringify(docs));
     }
   },
 
-  // --- LOGS & STATS ---
   logVisit: () => {
-    const data = localStorage.getItem(KEYS.STATS);
-    const s = data ? JSON.parse(data) : { totalVisits: 0 };
-    localStorage.setItem(KEYS.STATS, JSON.stringify({ ...s, totalVisits: (s.totalVisits || 0) + 1 }));
+    const data = JSON.parse(localStorage.getItem(KEYS.STATS) || '{"totalVisits":0}');
+    localStorage.setItem(KEYS.STATS, JSON.stringify({ ...data, totalVisits: data.totalVisits + 1 }));
   },
 
   logDownload: (email: string, fileName: string) => {
-    const data = localStorage.getItem(KEYS.VISITOR_ACTIVITY);
-    const activities = data ? JSON.parse(data) : [];
-    const newAct: VisitorActivity = { id: `d-${Date.now()}`, type: 'DOWNLOAD', email, fileName, timestamp: new Date().toLocaleString() };
+    const activities = JSON.parse(localStorage.getItem(KEYS.VISITOR_ACTIVITY) || '[]');
+    const newAct = { id: `d-${Date.now()}`, type: 'DOWNLOAD', email, fileName, timestamp: new Date().toLocaleString() };
     localStorage.setItem(KEYS.VISITOR_ACTIVITY, JSON.stringify([newAct, ...activities].slice(0, 500)));
   },
 
-  getVisitorActivities: (): VisitorActivity[] => {
-    const data = localStorage.getItem(KEYS.VISITOR_ACTIVITY);
-    return data ? JSON.parse(data) : [];
-  },
-
-  // Fix: Added missing getLogs method to storageService
-  getLogs: (): ActivityLog[] => {
-    const data = localStorage.getItem(KEYS.LOGS);
-    return data ? JSON.parse(data) : [];
-  },
-
+  getVisitorActivities: () => JSON.parse(localStorage.getItem(KEYS.VISITOR_ACTIVITY) || '[]'),
+  getLogs: () => JSON.parse(localStorage.getItem(KEYS.LOGS) || '[]'),
   addLog: (action: any, details: string) => {
-    const data = localStorage.getItem(KEYS.LOGS);
-    const logs = data ? JSON.parse(data) : [];
+    const logs = JSON.parse(localStorage.getItem(KEYS.LOGS) || '[]');
     const newLog = { id: Date.now().toString(), action, details, timestamp: new Date().toLocaleString() };
     localStorage.setItem(KEYS.LOGS, JSON.stringify([newLog, ...logs].slice(0, 100)));
   }
