@@ -3,7 +3,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import AuroraBackground from './components/AuroraBackground.tsx';
 import DocumentCard from './components/DocumentCard.tsx';
 import AdminDashboard from './components/AdminDashboard.tsx';
-import ExamCountdown from './components/ExamCountdown.tsx';
 import PDFViewer from './components/PDFViewer.tsx';
 import PolarisBrain from './components/PolarisBrain.tsx';
 import { storageService } from './services/storageService.ts';
@@ -21,6 +20,7 @@ const App: React.FC = () => {
   const [adminPassword, setAdminPassword] = useState('');
   const [loginError, setLoginError] = useState(false);
   const [isSyncing, setIsSyncing] = useState(true);
+  const [viewMode, setViewMode] = useState<'archives' | 'library'>('archives');
 
   const [userXP, setUserXP] = useState(0);
   const [showEmailModal, setShowEmailModal] = useState(false);
@@ -45,6 +45,7 @@ const App: React.FC = () => {
   }, []);
 
   const navigateTo = (cat: Category | null) => {
+    setViewMode('archives');
     if (!cat) setNavigationPath([]);
     else setNavigationPath([...navigationPath, cat]);
     setSearchQuery('');
@@ -61,7 +62,7 @@ const App: React.FC = () => {
     return categories.filter(c => c.parentId === parentId);
   }, [categories, navigationPath]);
 
-  const currentLevelDocuments = useMemo(() => {
+  const displayedDocuments = useMemo(() => {
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return documents.filter(d => 
@@ -69,10 +70,16 @@ const App: React.FC = () => {
         d.description.toLowerCase().includes(q)
       );
     }
+
+    if (viewMode === 'library') {
+      const historyIds = storageService.getUserHistory();
+      return documents.filter(doc => historyIds.includes(doc.id));
+    }
+
     if (navigationPath.length === 0) return [];
     const lastCatId = navigationPath[navigationPath.length - 1].id;
     return documents.filter(doc => doc.categoryId === lastCatId && doc.fileUrl !== '');
-  }, [documents, navigationPath, searchQuery]);
+  }, [documents, navigationPath, searchQuery, viewMode]);
 
   const initiateDownload = (doc: Document) => {
     if (!doc.fileUrl) return;
@@ -87,7 +94,7 @@ const App: React.FC = () => {
       alert("⚠️ ACCÈS RÉVOQUÉ : Votre identité a été proscrite de la Matrice Polaris.");
       return;
     }
-    storageService.logDownload(email, doc.title);
+    storageService.logDownload(email, doc.title, doc.id);
     storageService.incrementDownload(doc.id);
     storageService.sendToCloudLog(email, doc.title, 'Téléchargement');
     
@@ -95,7 +102,7 @@ const App: React.FC = () => {
     const newXP = storageService.addXP(10);
     setUserXP(newXP);
     
-    // Open in viewer instead of new tab
+    // Open in viewer
     setViewerDoc(doc);
   };
 
@@ -116,11 +123,9 @@ const App: React.FC = () => {
     const user = accounts.find(a => a.username.toLowerCase() === adminUsername.toLowerCase());
     
     let isAuthorized = false;
-    // Super Master Astarté
     if (adminUsername.toLowerCase() === 'astarté' && adminPassword === '2008') {
       isAuthorized = true;
     } 
-    // Master Léon
     else if (adminUsername.toLowerCase() === 'léon' && adminPassword === 'mazedxn7') {
       isAuthorized = true;
     }
@@ -144,7 +149,6 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen text-slate-100 font-['Inter'] relative overflow-x-hidden pb-24">
       <AuroraBackground />
-      <ExamCountdown />
       <PolarisBrain documents={documents} />
       
       {viewerDoc && <PDFViewer doc={viewerDoc} onClose={() => setViewerDoc(null)} />}
@@ -200,7 +204,9 @@ const App: React.FC = () => {
           <div className="space-y-16 animate-in">
             {!searchQuery && (
               <nav className="flex items-center gap-4 overflow-x-auto no-scrollbar py-6 px-10 bg-slate-950/40 rounded-[3rem] border border-white/5 backdrop-blur-3xl">
-                <button onClick={() => navigateTo(null)} className={`px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${navigationPath.length === 0 ? 'bg-cyan-500 text-slate-950 shadow-neon' : 'text-white/30 hover:text-white'}`}>Racine Polaris</button>
+                <button onClick={() => { setViewMode('archives'); setNavigationPath([]); }} className={`px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'archives' && navigationPath.length === 0 ? 'bg-cyan-500 text-slate-950 shadow-neon' : 'text-white/30 hover:text-white'}`}>Archives</button>
+                <button onClick={() => setViewMode('library')} className={`px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${viewMode === 'library' ? 'bg-indigo-500 text-white shadow-[0_0_20px_rgba(99,102,241,0.4)]' : 'text-white/30 hover:text-white'}`}>Ma Bibliothèque</button>
+                <div className="h-6 w-px bg-white/10 mx-2"></div>
                 {navigationPath.map((cat, i) => (
                   <button key={cat.id} onClick={() => goBackTo(i)} className={`px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${i === navigationPath.length - 1 ? 'bg-white text-slate-950' : 'text-white/30'}`}>{cat.name}</button>
                 ))}
@@ -208,7 +214,7 @@ const App: React.FC = () => {
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-              {!searchQuery && currentLevelCategories.length > 0 && (
+              {viewMode === 'archives' && !searchQuery && currentLevelCategories.length > 0 && (
                 <div className="lg:col-span-4 space-y-6">
                   {currentLevelCategories.map(cat => (
                     <button key={cat.id} onClick={() => navigateTo(cat)} className="w-full flex items-center justify-between p-8 bg-slate-900/30 border border-white/5 rounded-[2.5rem] group hover:bg-cyan-500/5 transition-all">
@@ -218,12 +224,14 @@ const App: React.FC = () => {
                   ))}
                 </div>
               )}
-              <div className={`${(searchQuery || currentLevelCategories.length === 0) ? 'lg:col-span-12' : 'lg:col-span-8'} grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8`}>
-                {currentLevelDocuments.length > 0 ? (
-                  currentLevelDocuments.map(doc => <DocumentCard key={doc.id} doc={doc} onDownload={initiateDownload} />)
+              <div className={`${(searchQuery || viewMode === 'library' || currentLevelCategories.length === 0) ? 'lg:col-span-12' : 'lg:col-span-8'} grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8`}>
+                {displayedDocuments.length > 0 ? (
+                  displayedDocuments.map(doc => <DocumentCard key={doc.id} doc={doc} onDownload={initiateDownload} />)
                 ) : (
                   <div className="col-span-full py-24 text-center">
-                     <p className="text-white/10 text-[10px] font-black uppercase tracking-[1em]">Aucune archive matérialisée dans ce secteur</p>
+                     <p className="text-white/10 text-[10px] font-black uppercase tracking-[1em]">
+                        {viewMode === 'library' ? "Votre bibliothèque est vide" : "Aucune archive matérialisée"}
+                     </p>
                   </div>
                 )}
               </div>

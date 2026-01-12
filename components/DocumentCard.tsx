@@ -20,8 +20,8 @@ const DocumentCard: React.FC<DocumentCardProps> = ({ doc, onDownload }) => {
     const docDate = new Date(doc.dateAdded);
     const now = new Date();
     const diffTime = Math.abs(now.getTime() - docDate.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays <= 7;
+    const diffHours = diffTime / (1000 * 60 * 60);
+    return diffHours <= 24; // Badge actif pendant 24 heures seulement
   };
 
   return (

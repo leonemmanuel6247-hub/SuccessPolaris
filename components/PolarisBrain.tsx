@@ -27,7 +27,8 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ documents }) => {
 
     const userText = input.trim();
     setInput('');
-    setMessages(prev => [...prev, { role: 'user', text: userText }]);
+    const newMessages = [...messages, { role: 'user', text: userText }] as ChatMessage[];
+    setMessages(newMessages);
     setIsTyping(true);
 
     try {
@@ -38,24 +39,26 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ documents }) => {
       Ton ton est encourageant, futuriste et précis. 
       Voici les documents disponibles sur le site : 
       ${docContext}
-      Réponds aux questions de l'élève et suggère-lui des documents spécifiques s'ils correspondent à sa demande.`;
+      Réponds aux questions de l'élève et suggère-lui des documents spécifiques s'ils correspondent à sa demande. 
+      Utilise le tutoiement pour créer un lien de mentorat.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-lite-latest',
-        contents: [
-          { role: 'user', parts: [{ text: systemPrompt }] },
-          ...messages.map(m => ({
-            role: m.role === 'user' ? 'user' : 'model',
-            parts: [{ text: m.text }]
-          })),
-          { role: 'user', parts: [{ text: userText }] }
-        ],
+        model: 'gemini-3-flash-preview',
+        contents: newMessages.map(m => ({
+          role: m.role === 'user' ? 'user' : 'model',
+          parts: [{ text: m.text }]
+        })),
+        config: {
+          systemInstruction: systemPrompt,
+          temperature: 0.7,
+        }
       });
 
       const aiText = response.text || "Je n'ai pas pu formuler de réponse. Réessaie, élève.";
       setMessages(prev => [...prev, { role: 'model', text: aiText }]);
     } catch (err) {
-      setMessages(prev => [...prev, { role: 'model', text: "Erreur de connexion à la Matrice. Vérifie tes protocoles." }]);
+      console.error('Gemini API Error:', err);
+      setMessages(prev => [...prev, { role: 'model', text: "Erreur de connexion à la Matrice. Vérifie tes protocoles ou l'état de la constellation réseau." }]);
     } finally {
       setIsTyping(false);
     }
@@ -79,7 +82,7 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ documents }) => {
              </div>
              <div>
                 <h4 className="text-[11px] font-black uppercase tracking-widest text-white">Astarté</h4>
-                <p className="text-[8px] text-cyan-400/60 uppercase font-black">Interface Tuteur v2.5</p>
+                <p className="text-[8px] text-cyan-400/60 uppercase font-black">Interface Tuteur v3.0</p>
              </div>
           </div>
 
