@@ -16,6 +16,14 @@ const DocumentCard: React.FC<DocumentCardProps> = ({ doc, onDownload }) => {
     }
   };
 
+  const isNew = () => {
+    const docDate = new Date(doc.dateAdded);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - docDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays <= 7;
+  };
+
   return (
     <div className="group relative bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-[2rem] p-6 hover:border-cyan-500/40 transition-all duration-500 overflow-hidden flex flex-col justify-between shadow-xl">
       <div className="absolute -top-16 -right-16 w-32 h-32 bg-cyan-500/5 rounded-full blur-[40px] group-hover:bg-cyan-500/10 transition-all duration-700"></div>
@@ -27,6 +35,9 @@ const DocumentCard: React.FC<DocumentCardProps> = ({ doc, onDownload }) => {
           </div>
           <div className="flex flex-col items-end">
              <span className="text-[8px] text-cyan-400 font-black uppercase tracking-widest">{doc.size || 'N/A'}</span>
+             {isNew() && (
+               <span className="mt-2 bg-cyan-500 text-slate-950 text-[7px] font-black px-2 py-0.5 rounded-full animate-pulse shadow-neon">NEW</span>
+             )}
           </div>
         </div>
         

@@ -4,6 +4,7 @@ import { storageService } from '../services/storageService.ts';
 import { Category, Document, VisitorActivity, AdminAccount } from '../types.ts';
 import { GOOGLE_SHEET_ID } from '../constants.ts';
 import DocumentCard from './DocumentCard.tsx';
+import AdminStats from './AdminStats.tsx';
 
 interface AdminDashboardProps {
   categories: Category[];
@@ -13,7 +14,7 @@ interface AdminDashboardProps {
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, currentAdmin, onRefresh }) => {
-  const [activeTab, setActiveTab] = useState<'status' | 'architect' | 'spy' | 'keys' | 'logs'>('status');
+  const [activeTab, setActiveTab] = useState<'status' | 'stats' | 'architect' | 'spy' | 'keys' | 'logs'>('status');
   const [activities, setActivities] = useState<VisitorActivity[]>([]);
   const [accounts, setAccounts] = useState<AdminAccount[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -99,10 +100,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
     <div className="bg-slate-950/40 rounded-[2rem] md:rounded-[3rem] border border-white/5 overflow-hidden backdrop-blur-3xl shadow-2xl flex flex-col min-h-[600px]">
       <div className="flex bg-black/60 overflow-x-auto no-scrollbar border-b border-white/10">
         {[
-          { id: 'status', label: 'État Cloud', icon: '☁️' },
+          { id: 'status', label: 'Matrice', icon: '☁️' },
+          { id: 'stats', label: 'Analyse', icon: '📊' },
           { id: 'architect', label: 'Architecte', icon: '🏛️' },
           { id: 'spy', label: 'Espionnage', icon: '👁️' },
-          ...(currentAdmin?.role === 'SUPER_MASTER' ? [{ id: 'keys', label: 'Clés Stellaires', icon: '🔑' }] : []),
+          ...(currentAdmin?.role === 'SUPER_MASTER' ? [{ id: 'keys', label: 'Clés', icon: '🔑' }] : []),
           { id: 'logs', label: 'Système', icon: '📟' }
         ].map(tab => (
           <button
@@ -133,6 +135,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
             </div>
           </div>
         )}
+
+        {activeTab === 'stats' && <AdminStats />}
 
         {activeTab === 'architect' && (
           <div className="max-w-4xl mx-auto w-full space-y-12 animate-in py-6">

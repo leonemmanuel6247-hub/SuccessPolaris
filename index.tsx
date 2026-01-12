@@ -15,7 +15,15 @@ root.render(
   </React.StrictMode>
 );
 
-// Cette fonction assure que le loader disparaît dès que le script a fini de monter l'App
+// Enregistrement du Service Worker pour la PWA
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(err => {
+      console.log('SW registration failed: ', err);
+    });
+  });
+}
+
 const removeLoader = () => {
     const loader = document.getElementById('loader');
     if (loader) {
@@ -26,12 +34,10 @@ const removeLoader = () => {
     }
 };
 
-// Exécution de la suppression
 if (document.readyState === 'complete') {
     removeLoader();
 } else {
     window.addEventListener('load', removeLoader);
 }
 
-// Sécurité supplémentaire
 setTimeout(removeLoader, 3000);

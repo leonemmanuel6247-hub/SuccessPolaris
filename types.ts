@@ -13,13 +13,6 @@ export interface AdminAccount {
   lastLogin: string;
 }
 
-export interface CloudConfig {
-  driveFolderId: string;
-  apiKey: string;
-  isConnected: boolean;
-  lastSync: string;
-}
-
 export interface Document {
   id: string;
   title: string;
@@ -41,15 +34,20 @@ export interface VisitorActivity {
   timestamp: string;
 }
 
-export interface Stats {
-  totalVisits: number;
-  totalDownloads: number;
-  mostViewedCategory?: string;
-}
-
 export interface ActivityLog {
   id: string;
   action: 'AUTH' | 'SYSTEM' | 'UPLOAD' | 'DELETE' | 'CONFIG' | 'TRAÇAGE' | 'ACCOUNT' | 'BAN';
   timestamp: string;
   details: string;
+}
+
+export interface UserProfile {
+  xp: number;
+  email: string;
+  level: string;
+}
+
+export interface ChatMessage {
+  role: 'user' | 'model';
+  text: string;
 }

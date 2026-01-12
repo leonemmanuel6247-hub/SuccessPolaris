@@ -1,5 +1,5 @@
 
-import { Category, Document, AdminAccount, VisitorActivity } from '../types.ts';
+import { Category, Document, AdminAccount, VisitorActivity, UserProfile } from '../types.ts';
 import { GOOGLE_SHEET_ID, APPS_SCRIPT_WEBHOOK_URL } from '../constants.ts';
 
 const KEYS = {
@@ -11,7 +11,8 @@ const KEYS = {
   ACCOUNTS: 'sp_admin_accounts',
   LAST_SYNC: 'sp_last_sync',
   USER_EMAIL: 'sp_user_identity',
-  BANNED_EMAILS: 'sp_banned_list'
+  BANNED_EMAILS: 'sp_banned_list',
+  USER_XP: 'sp_user_xp'
 };
 
 const parseCSV = (csv: string) => {
@@ -25,6 +26,7 @@ const parseCSV = (csv: string) => {
       url: values[1] || '',
       category: values[2] || '',
       subCategory: values[3] || '',
+      date: values[4] || new Date().toISOString(),
       id: `doc-${index}`
     };
   });
@@ -71,13 +73,13 @@ export const storageService = {
         documents.push({
           id: row.id,
           title: row.title,
-          description: `Archive classée en ${mainCatName}${subCatName ? ' &gt; ' + subCatName : ''}`,
+          description: `Archive classée en ${mainCatName}${subCatName ? ' > ' + subCatName : ''}`,
           categoryId: currentParentId,
-          fileUrl: storageService.optimizeDriveUrl(row.url),
+          fileUrl: row.url, 
           fileType: 'pdf',
           tags: [mainCatName],
           downloads: 0,
-          dateAdded: new Date().toISOString(),
+          dateAdded: row.date,
           size: 'Auto'
         });
       });
@@ -88,7 +90,6 @@ export const storageService = {
       
       return { categories, documents };
     } catch (error) {
-      console.error("ERREUR MATRICE :", error);
       return { 
         categories: JSON.parse(localStorage.getItem(KEYS.CATEGORIES) || '[]'), 
         documents: JSON.parse(localStorage.getItem(KEYS.DOCUMENTS) || '[]') 
@@ -96,35 +97,48 @@ export const storageService = {
     }
   },
 
-  optimizeDriveUrl: (url: string): string => {
-    if (!url || url === '' || url === 'undefined') return '';
-    if (url.includes('drive.google.com')) {
-      const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-      const id = idMatch ? idMatch[1] : null;
-      if (id) return `https://drive.google.com/uc?export=download&id=${id}`;
-    }
-    return url;
+  getDrivePreviewUrl: (url: string): string => {
+    if (!url || !url.includes('drive.google.com')) return url;
+    const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    return idMatch ? `https://drive.google.com/file/d/${idMatch[1]}/preview` : url;
+  },
+
+  getUserXP: (): number => parseInt(localStorage.getItem(KEYS.USER_XP) || '0'),
+  addXP: (amount: number): number => {
+    const newXP = storageService.getUserXP() + amount;
+    localStorage.setItem(KEYS.USER_XP, newXP.toString());
+    return newXP;
+  },
+  getGrade: (xp: number): string => {
+    if (xp < 200) return 'Apprenti';
+    if (xp < 800) return 'Initié';
+    if (xp < 2000) return 'Expert';
+    if (xp < 5000) return 'Maître';
+    return 'Légende Némésis';
   },
 
   saveUserEmail: (email: string) => localStorage.setItem(KEYS.USER_EMAIL, email),
   getUserEmail: () => localStorage.getItem(KEYS.USER_EMAIL),
 
-  banEmail: (email: string) => {
-    const list = storageService.getBannedEmails();
-    if (!list.includes(email)) {
-      localStorage.setItem(KEYS.BANNED_EMAILS, JSON.stringify([...list, email]));
-      storageService.addLog('BAN', `Bannissement de ${email}`);
+  getBannedEmails: (): string[] => JSON.parse(localStorage.getItem(KEYS.BANNED_EMAILS) || '[]'),
+  isEmailBanned: (email: string): boolean => storageService.getBannedEmails().includes(email),
+
+  // Fix: Added missing banEmail method
+  banEmail: (email: string): void => {
+    const banned = storageService.getBannedEmails();
+    if (!banned.includes(email)) {
+      localStorage.setItem(KEYS.BANNED_EMAILS, JSON.stringify([...banned, email]));
+      storageService.addLog('BAN', `Email banni : ${email}`);
     }
   },
 
-  unbanEmail: (email: string) => {
-    const list = storageService.getBannedEmails().filter(e => e !== email);
-    localStorage.setItem(KEYS.BANNED_EMAILS, JSON.stringify(list));
-    storageService.addLog('BAN', `Réactivation de ${email}`);
+  // Fix: Added missing unbanEmail method
+  unbanEmail: (email: string): void => {
+    const banned = storageService.getBannedEmails();
+    const filtered = banned.filter(e => e !== email);
+    localStorage.setItem(KEYS.BANNED_EMAILS, JSON.stringify(filtered));
+    storageService.addLog('BAN', `Email débanni : ${email}`);
   },
-
-  getBannedEmails: (): string[] => JSON.parse(localStorage.getItem(KEYS.BANNED_EMAILS) || '[]'),
-  isEmailBanned: (email: string): boolean => storageService.getBannedEmails().includes(email),
 
   sendToCloudLog: async (email: string, fileName: string, action: string = 'Téléchargement') => {
     const payload = { email, action, fichier: fileName, timestamp: new Date().toLocaleString('fr-FR') };
@@ -135,9 +149,7 @@ export const storageService = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-    } catch (e) {
-      console.warn("Tracking cloud off");
-    }
+    } catch (e) {}
   },
 
   getAccounts: (): AdminAccount[] => {
@@ -153,38 +165,62 @@ export const storageService = {
     return JSON.parse(data);
   },
 
-  addAccount: (username: string, role: 'MASTER' | 'EDITOR') => {
+  // Fix: Added missing addAccount method
+  addAccount: (username: string, role: 'SUPER_MASTER' | 'MASTER' | 'EDITOR'): void => {
     const accounts = storageService.getAccounts();
-    const newAcc: AdminAccount = {
+    const newAccount: AdminAccount = {
       id: Date.now().toString(),
       username,
       role,
-      lastLogin: 'Jamais'
+      lastLogin: new Date().toISOString()
     };
-    localStorage.setItem(KEYS.ACCOUNTS, JSON.stringify([...accounts, newAcc]));
+    localStorage.setItem(KEYS.ACCOUNTS, JSON.stringify([...accounts, newAccount]));
   },
 
-  removeAccount: (id: string) => {
-    const accounts = storageService.getAccounts().filter(a => a.id !== id);
-    localStorage.setItem(KEYS.ACCOUNTS, JSON.stringify(accounts));
+  // Fix: Added missing removeAccount method
+  removeAccount: (id: string): void => {
+    const accounts = storageService.getAccounts();
+    const filtered = accounts.filter(a => a.id !== id);
+    localStorage.setItem(KEYS.ACCOUNTS, JSON.stringify(filtered));
   },
 
-  getCategories: () => JSON.parse(localStorage.getItem(KEYS.CATEGORIES) || '[]'),
-  getDocuments: () => JSON.parse(localStorage.getItem(KEYS.DOCUMENTS) || '[]'),
-  getLastSync: () => localStorage.getItem(KEYS.LAST_SYNC) || 'Jamais',
+  getVisitorActivities: () => JSON.parse(localStorage.getItem(KEYS.VISITOR_ACTIVITY) || '[]'),
   
-  incrementDownload: (id: string) => {
-    const docs = storageService.getDocuments();
-    const idx = docs.findIndex(d => d.id === id);
-    if (idx > -1) {
-      docs[idx].downloads += 1;
-      localStorage.setItem(KEYS.DOCUMENTS, JSON.stringify(docs));
+  getAdvancedStats: () => {
+    const activities: VisitorActivity[] = JSON.parse(localStorage.getItem(KEYS.VISITOR_ACTIVITY) || '[]');
+    const docs: Document[] = JSON.parse(localStorage.getItem(KEYS.DOCUMENTS) || '[]');
+    const topDocs = [...docs].sort((a, b) => b.downloads - a.downloads).slice(0, 5);
+    const uniqueEmails = new Set(activities.filter(a => a.email).map(a => a.email));
+    
+    const dailyStats: { [key: string]: number } = {};
+    const now = new Date();
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        dailyStats[d.toLocaleDateString('fr-FR')] = 0;
     }
+    
+    activities.forEach(act => {
+        const dateStr = act.timestamp.split(' ')[0];
+        if (dailyStats.hasOwnProperty(dateStr)) dailyStats[dateStr]++;
+    });
+
+    const chartData = Object.keys(dailyStats).map(date => ({ date, downloads: dailyStats[date] })).reverse();
+    return { topDocs, totalUniqueUsers: uniqueEmails.size, chartData };
   },
 
-  logVisit: () => {
-    const data = JSON.parse(localStorage.getItem(KEYS.STATS) || '{"totalVisits":0}');
-    localStorage.setItem(KEYS.STATS, JSON.stringify({ ...data, totalVisits: data.totalVisits + 1 }));
+  getLogs: () => JSON.parse(localStorage.getItem(KEYS.LOGS) || '[]'),
+  addLog: (action: any, details: string) => {
+    const logs = JSON.parse(localStorage.getItem(KEYS.LOGS) || '[]');
+    const newLog = { id: Date.now().toString(), action, details, timestamp: new Date().toLocaleString() };
+    localStorage.setItem(KEYS.LOGS, JSON.stringify([newLog, ...logs].slice(0, 100)));
+  },
+
+  // Fix: Added missing logVisit method
+  logVisit: (): void => {
+    const activities = JSON.parse(localStorage.getItem(KEYS.VISITOR_ACTIVITY) || '[]');
+    const newAct = { id: `v-${Date.now()}`, type: 'VISIT', timestamp: new Date().toLocaleString() };
+    localStorage.setItem(KEYS.VISITOR_ACTIVITY, JSON.stringify([newAct, ...activities].slice(0, 500)));
   },
 
   logDownload: (email: string, fileName: string) => {
@@ -192,12 +228,12 @@ export const storageService = {
     const newAct = { id: `d-${Date.now()}`, type: 'DOWNLOAD', email, fileName, timestamp: new Date().toLocaleString() };
     localStorage.setItem(KEYS.VISITOR_ACTIVITY, JSON.stringify([newAct, ...activities].slice(0, 500)));
   },
-
-  getVisitorActivities: () => JSON.parse(localStorage.getItem(KEYS.VISITOR_ACTIVITY) || '[]'),
-  getLogs: () => JSON.parse(localStorage.getItem(KEYS.LOGS) || '[]'),
-  addLog: (action: any, details: string) => {
-    const logs = JSON.parse(localStorage.getItem(KEYS.LOGS) || '[]');
-    const newLog = { id: Date.now().toString(), action, details, timestamp: new Date().toLocaleString() };
-    localStorage.setItem(KEYS.LOGS, JSON.stringify([newLog, ...logs].slice(0, 100)));
+  incrementDownload: (id: string) => {
+    const docs = JSON.parse(localStorage.getItem(KEYS.DOCUMENTS) || '[]');
+    const idx = docs.findIndex((d: any) => d.id === id);
+    if (idx > -1) {
+      docs[idx].downloads += 1;
+      localStorage.setItem(KEYS.DOCUMENTS, JSON.stringify(docs));
+    }
   }
 };
