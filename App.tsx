@@ -98,11 +98,9 @@ const App: React.FC = () => {
     storageService.incrementDownload(doc.id);
     storageService.sendToCloudLog(email, doc.title, 'Téléchargement');
     
-    // XP Gamification
     const newXP = storageService.addXP(10);
     setUserXP(newXP);
     
-    // Open in viewer
     setViewerDoc(doc);
   };
 
@@ -149,7 +147,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen text-slate-100 font-['Inter'] relative overflow-x-hidden pb-24">
       <AuroraBackground />
-      <PolarisBrain documents={documents} />
+      <PolarisBrain count={documents.length} />
       
       {viewerDoc && <PDFViewer doc={viewerDoc} onClose={() => setViewerDoc(null)} />}
 

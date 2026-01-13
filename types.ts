@@ -46,8 +46,3 @@ export interface UserProfile {
   email: string;
   level: string;
 }
-
-export interface ChatMessage {
-  role: 'user' | 'model';
-  text: string;
-}

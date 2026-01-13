@@ -26,6 +26,46 @@
                 }
             }
         }
+
+        // --- PROTOCOLES DE SÉCURITÉ NÉMÉSIS ---
+        
+        // Blocage du clic droit
+        document.addEventListener('contextmenu', e => e.preventDefault());
+
+        // Blocage des raccourcis de développement et d'inspection
+        document.onkeydown = function(e) {
+            // F12
+            if (e.keyCode == 123) return false;
+            // Ctrl+Maj+I, Ctrl+Maj+J, Ctrl+Maj+C (Inspecter)
+            if (e.ctrlKey && e.shiftKey && (e.keyCode == 'I'.charCodeAt(0) || e.keyCode == 'J'.charCodeAt(0) || e.keyCode == 'C'.charCodeAt(0))) return false;
+            // Ctrl+U (Afficher code source)
+            if (e.ctrlKey && e.keyCode == 'U'.charCodeAt(0)) return false;
+            // Ctrl+S (Sauvegarder la page)
+            if (e.ctrlKey && e.keyCode == 'S'.charCodeAt(0)) return false;
+            // Ctrl+P (Imprimer)
+            if (e.ctrlKey && e.keyCode == 'P'.charCodeAt(0)) return false;
+        };
+
+        // Détection de l'ouverture de la console (Protection par boucle debugger)
+        (function() {
+            const check = function() {
+                const start = new Date();
+                debugger;
+                const end = new Date();
+                if (end - start > 100) {
+                    // Si le debugger a ralenti l'exécution, c'est que la console est ouverte
+                    document.body.innerHTML = "<div style='background:#020617;color:#00d4ff;height:100vh;display:flex;align-items:center;justify-content:center;font-family:sans-serif;font-weight:900;text-align:center;padding:20px;'>ACCÈS RÉVOQUÉ<br>TENTATIVE D'INTRUSION DÉTECTÉE DANS LA MATRICE POLARIS</div>";
+                }
+            };
+            setInterval(check, 1000);
+        })();
+
+        // Blocage du drag & drop pour éviter le vol d'images/assets
+        document.addEventListener('dragstart', e => e.preventDefault());
+        document.addEventListener('drop', e => e.preventDefault());
+
+        console.log("%cACCÈS RÉSERVÉ À NÉMÉSIS", "color: #00d4ff; font-size: 40px; font-weight: bold; text-shadow: 0 0 10px #00d4ff;");
+        console.log("%cLe code source est protégé par chiffrement astral. Toute reproduction est proscrite.", "color: white; font-size: 14px; font-style: italic;");
     </script>
     <style>
         body {
@@ -34,6 +74,16 @@
             color: #f8fafc;
             margin: 0;
             overflow-x: hidden;
+            /* Protection contre la sélection de texte */
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+        /* Autoriser la sélection uniquement dans les champs d'entrée */
+        input, textarea {
+            user-select: auto !important;
+            -webkit-user-select: auto !important;
         }
         #root {
             min-height: 100vh;
@@ -97,6 +147,19 @@
         @keyframes loading-anim {
             0% { left: -40%; }
             100% { left: 140%; }
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .shadow-neon {
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+        }
+        .drop-shadow-neon {
+            filter: drop-shadow(0 0 8px rgba(0, 212, 255, 0.6));
         }
     </style>
     <script type="importmap">
