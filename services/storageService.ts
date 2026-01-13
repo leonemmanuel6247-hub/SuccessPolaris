@@ -1,6 +1,6 @@
 
 import { Category, Document, AdminAccount, VisitorActivity, UserProfile } from '../types.ts';
-import { GOOGLE_SHEET_ID, APPS_SCRIPT_WEBHOOK_URL } from '../constants.ts';
+import { GOOGLE_SHEET_ID, APPS_SCRIPT_WEBHOOK_URL, COUNT_API_URL } from '../constants.ts';
 
 const KEYS = {
   CATEGORIES: 'sp_categories',
@@ -21,7 +21,6 @@ const parseCSV = (csv: string) => {
   const lines = csv.split('\n').filter(line => line.trim() !== '');
   if (lines.length <= 1) return { rows: [], totalCount: 0 };
   
-  // Le nombre total de documents correspond au nombre de lignes moins l'en-tête
   const totalCount = lines.length - 1;
 
   const rows = lines.slice(1).map((line, index) => {
@@ -40,15 +39,32 @@ const parseCSV = (csv: string) => {
 };
 
 export const storageService = {
+  // Récupère uniquement le total via l'API JSON rapide
+  fetchGlobalTotal: async (): Promise<number> => {
+    try {
+      const response = await fetch(COUNT_API_URL);
+      if (!response.ok) throw new Error();
+      const data = await response.json();
+      return data.total || 0;
+    } catch (e) {
+      return parseInt(localStorage.getItem(KEYS.SHEET_ROW_COUNT) || '0');
+    }
+  },
+
   fetchFromSheets: async (): Promise<{ categories: Category[], documents: Document[], totalCount: number }> => {
     try {
-      // Construction de l'URL publique de publication CSV
-      const csvUrl = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/export?format=csv&gid=0`;
+      const timestamp = new Date().getTime();
+      const csvUrl = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/pub?output=csv&t=${timestamp}`;
+      
       const response = await fetch(csvUrl);
       if (!response.ok) throw new Error('Matrice Polaris injoignable');
       
       const csvData = await response.text();
-      const { rows, totalCount } = parseCSV(csvData);
+      const { rows, totalCount: csvTotal } = parseCSV(csvData);
+
+      // On tente de récupérer un total plus précis via l'API JSON
+      const apiTotal = await storageService.fetchGlobalTotal();
+      const finalTotal = apiTotal > 0 ? apiTotal : csvTotal;
 
       const categories: Category[] = [];
       const documents: Document[] = [];
@@ -56,7 +72,6 @@ export const storageService = {
 
       rows.forEach(row => {
         if (!row.title || !row.url || !row.category) return;
-
         const mainCatName = row.category.trim().toUpperCase();
         const subCatName = row.subCategory ? row.subCategory.trim().toUpperCase() : null;
 
@@ -65,9 +80,7 @@ export const storageService = {
           categoryMap.set(mainCatName, catId);
           categories.push({ id: catId, name: mainCatName, parentId: null, icon: '🪐' });
         }
-
         let currentParentId = categoryMap.get(mainCatName)!;
-
         if (subCatName) {
           const subKey = `${mainCatName}_${subCatName}`;
           if (!categoryMap.has(subKey)) {
@@ -77,7 +90,6 @@ export const storageService = {
           }
           currentParentId = categoryMap.get(subKey)!;
         }
-
         documents.push({
           id: row.id,
           title: row.title,
@@ -94,10 +106,10 @@ export const storageService = {
 
       localStorage.setItem(KEYS.DOCUMENTS, JSON.stringify(documents));
       localStorage.setItem(KEYS.CATEGORIES, JSON.stringify(categories));
-      localStorage.setItem(KEYS.SHEET_ROW_COUNT, totalCount.toString());
+      localStorage.setItem(KEYS.SHEET_ROW_COUNT, finalTotal.toString());
       localStorage.setItem(KEYS.LAST_SYNC, new Date().toISOString());
       
-      return { categories, documents, totalCount };
+      return { categories, documents, totalCount: finalTotal };
     } catch (error) {
       return { 
         categories: JSON.parse(localStorage.getItem(KEYS.CATEGORIES) || '[]'), 

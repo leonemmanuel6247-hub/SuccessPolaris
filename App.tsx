@@ -33,10 +33,16 @@ const App: React.FC = () => {
 
   const syncData = async () => {
     setIsSyncing(true);
+    // On récupère le total JSON en priorité
+    const total = await storageService.fetchGlobalTotal();
+    setTotalCount(total);
+    
+    // Puis on récupère les documents
     const data = await storageService.fetchFromSheets();
     setCategories(data.categories);
     setDocuments(data.documents);
-    setTotalCount(data.totalCount);
+    if (data.totalCount > 0) setTotalCount(data.totalCount);
+    
     setTimeout(() => setIsSyncing(false), 1000);
   };
 
@@ -157,7 +163,7 @@ const App: React.FC = () => {
       {viewerDoc && <PDFViewer doc={viewerDoc} onClose={() => setViewerDoc(null)} />}
 
       <header className="container mx-auto px-6 py-12 flex flex-col items-center gap-12 relative z-50">
-        <div className="w-full flex justify-between items-start max-w-6xl">
+        <div className="w-full flex flex-col md:flex-row justify-between items-center gap-8 max-w-6xl">
            <div className="flex flex-col items-center gap-6 cursor-pointer group" onClick={() => navigateTo(null)}>
               <div className="w-16 h-16 bg-slate-900/90 border border-white/10 rounded-[1.5rem] flex items-center justify-center relative shadow-neon group-hover:scale-110 transition-all duration-700">
                  <i className="fas fa-star text-cyan-400 text-xl group-hover:rotate-[360deg] transition-all duration-1000"></i>
@@ -167,13 +173,28 @@ const App: React.FC = () => {
               </h1>
            </div>
 
-           <div className="bg-slate-950/60 backdrop-blur-2xl border border-white/10 p-4 rounded-[2rem] flex items-center gap-6 shadow-xl">
-              <div className="text-right">
-                 <p className="text-[10px] font-black uppercase text-cyan-400">{userGrade}</p>
-                 <p className="text-[8px] text-white/40 uppercase font-black">{userXP} XP ACQUIS</p>
+           <div className="flex items-center gap-4">
+              {/* NOUVEAU COMPTEUR DANS LE HEADER */}
+              <div className="bg-slate-950/60 backdrop-blur-2xl border border-cyan-500/20 p-4 rounded-[2rem] flex items-center gap-5 shadow-2xl border-l-cyan-500/50">
+                 <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center border border-cyan-400/20 shadow-neon">
+                    <i className="fas fa-folder-open text-cyan-400 text-sm"></i>
+                 </div>
+                 <div className="flex flex-col">
+                    <p className="text-[7px] font-black uppercase text-cyan-400/60 tracking-[0.2em]">Base de données</p>
+                    <p className="text-[14px] font-black text-white uppercase tracking-tight">
+                       {totalCount} <span className="text-[9px] text-white/40">Archives</span>
+                    </p>
+                 </div>
               </div>
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-indigo-600 flex items-center justify-center shadow-neon">
-                 <i className="fas fa-user-shield text-slate-950"></i>
+
+              <div className="bg-slate-950/60 backdrop-blur-2xl border border-white/10 p-4 rounded-[2rem] flex items-center gap-6 shadow-xl">
+                  <div className="text-right hidden sm:block">
+                    <p className="text-[10px] font-black uppercase text-cyan-400">{userGrade}</p>
+                    <p className="text-[8px] text-white/40 uppercase font-black">{userXP} XP ACQUIS</p>
+                  </div>
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-indigo-600 flex items-center justify-center shadow-neon">
+                    <i className="fas fa-user-shield text-slate-950"></i>
+                  </div>
               </div>
            </div>
         </div>

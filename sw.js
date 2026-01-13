@@ -16,6 +16,11 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('fetch', event => {
+  // NE PAS CACHER LES APPELS À GOOGLE SHEETS
+  if (event.request.url.includes('google.com/spreadsheets')) {
+    return fetch(event.request);
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then(response => {
