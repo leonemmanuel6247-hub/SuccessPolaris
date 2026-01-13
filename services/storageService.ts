@@ -13,14 +13,18 @@ const KEYS = {
   USER_EMAIL: 'sp_user_identity',
   BANNED_EMAILS: 'sp_banned_list',
   USER_XP: 'sp_user_xp',
-  USER_HISTORY: 'sp_user_doc_history' // Nouvelle clé pour l'historique local
+  USER_HISTORY: 'sp_user_doc_history',
+  SHEET_ROW_COUNT: 'sp_document_total_count'
 };
 
 const parseCSV = (csv: string) => {
   const lines = csv.split('\n').filter(line => line.trim() !== '');
-  if (lines.length === 0) return [];
+  if (lines.length <= 1) return { rows: [], totalCount: 0 };
   
-  return lines.slice(1).map((line, index) => {
+  // Le nombre total de documents correspond au nombre de lignes moins l'en-tête
+  const totalCount = lines.length - 1;
+
+  const rows = lines.slice(1).map((line, index) => {
     const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.trim().replace(/^"|"$/g, ''));
     return {
       title: values[0] || '',
@@ -31,23 +35,26 @@ const parseCSV = (csv: string) => {
       id: `doc-${index}`
     };
   });
+
+  return { rows, totalCount };
 };
 
 export const storageService = {
-  fetchFromSheets: async (): Promise<{ categories: Category[], documents: Document[] }> => {
+  fetchFromSheets: async (): Promise<{ categories: Category[], documents: Document[], totalCount: number }> => {
     try {
+      // Construction de l'URL publique de publication CSV
       const csvUrl = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/export?format=csv&gid=0`;
       const response = await fetch(csvUrl);
       if (!response.ok) throw new Error('Matrice Polaris injoignable');
       
       const csvData = await response.text();
-      const rawRows = parseCSV(csvData);
+      const { rows, totalCount } = parseCSV(csvData);
 
       const categories: Category[] = [];
       const documents: Document[] = [];
       const categoryMap = new Map<string, string>();
 
-      rawRows.forEach(row => {
+      rows.forEach(row => {
         if (!row.title || !row.url || !row.category) return;
 
         const mainCatName = row.category.trim().toUpperCase();
@@ -87,13 +94,15 @@ export const storageService = {
 
       localStorage.setItem(KEYS.DOCUMENTS, JSON.stringify(documents));
       localStorage.setItem(KEYS.CATEGORIES, JSON.stringify(categories));
+      localStorage.setItem(KEYS.SHEET_ROW_COUNT, totalCount.toString());
       localStorage.setItem(KEYS.LAST_SYNC, new Date().toISOString());
       
-      return { categories, documents };
+      return { categories, documents, totalCount };
     } catch (error) {
       return { 
         categories: JSON.parse(localStorage.getItem(KEYS.CATEGORIES) || '[]'), 
-        documents: JSON.parse(localStorage.getItem(KEYS.DOCUMENTS) || '[]') 
+        documents: JSON.parse(localStorage.getItem(KEYS.DOCUMENTS) || '[]'),
+        totalCount: parseInt(localStorage.getItem(KEYS.SHEET_ROW_COUNT) || '0')
       };
     }
   },

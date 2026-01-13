@@ -5,12 +5,14 @@ import DocumentCard from './components/DocumentCard.tsx';
 import AdminDashboard from './components/AdminDashboard.tsx';
 import PDFViewer from './components/PDFViewer.tsx';
 import PolarisBrain from './components/PolarisBrain.tsx';
+import ExamCountdown from './components/ExamCountdown.tsx';
 import { storageService } from './services/storageService.ts';
 import { Category, Document, AdminAccount } from './types.ts';
 
 const App: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [navigationPath, setNavigationPath] = useState<Category[]>([]);
   const [isAdminMode, setIsAdminMode] = useState(false);
@@ -30,9 +32,11 @@ const App: React.FC = () => {
   const [emailError, setEmailError] = useState('');
 
   const syncData = async () => {
+    setIsSyncing(true);
     const data = await storageService.fetchFromSheets();
     setCategories(data.categories);
     setDocuments(data.documents);
+    setTotalCount(data.totalCount);
     setTimeout(() => setIsSyncing(false), 1000);
   };
 
@@ -147,7 +151,8 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen text-slate-100 font-['Inter'] relative overflow-x-hidden pb-24">
       <AuroraBackground />
-      <PolarisBrain count={documents.length} />
+      <ExamCountdown />
+      <PolarisBrain count={totalCount} />
       
       {viewerDoc && <PDFViewer doc={viewerDoc} onClose={() => setViewerDoc(null)} />}
 
@@ -179,8 +184,8 @@ const App: React.FC = () => {
               <input 
                 type="text" 
                 placeholder="Scanner les archives de la Matrice..." 
-                value={searchQuery} 
-                onChange={(e) => setSearchQuery(e.target.value)} 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="flex-1 bg-transparent px-6 py-5 text-[14px] outline-none font-bold text-white placeholder-white/20" 
               />
            </div>
