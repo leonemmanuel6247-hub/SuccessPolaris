@@ -29,21 +29,48 @@ const App: React.FC = () => {
   const [pendingDoc, setPendingDoc] = useState<Document | null>(null);
   const [viewerDoc, setViewerDoc] = useState<Document | null>(null);
   const [userEmail, setUserEmail] = useState('');
-  const [emailError, setEmailError] = useState('');
 
   const syncData = async () => {
     setIsSyncing(true);
-    // On récupère le total JSON en priorité
-    const total = await storageService.fetchGlobalTotal();
-    setTotalCount(total);
     
-    // Puis on récupère les documents
-    const data = await storageService.fetchFromSheets();
-    setCategories(data.categories);
-    setDocuments(data.documents);
-    if (data.totalCount > 0) setTotalCount(data.totalCount);
+    // ÉTAPE 0 : Chargement immédiat du cache local pour une réactivité instantanée
+    const cachedDocs = localStorage.getItem('sp_documents');
+    const cachedCats = localStorage.getItem('sp_categories');
+    const cachedCount = localStorage.getItem('sp_document_total_count');
     
-    setTimeout(() => setIsSyncing(false), 1000);
+    if (cachedDocs && cachedCats) {
+      setDocuments(JSON.parse(cachedDocs));
+      setCategories(JSON.parse(cachedCats));
+      setTotalCount(parseInt(cachedCount || '0'));
+    }
+
+    // ÉTAPE 1 : Synchronisation du Compteur (Canal A)
+    const fetchCounter = async () => {
+      try {
+        const count = await storageService.chargerCompteur();
+        setTotalCount(count);
+      } catch (e) {
+        console.warn("Canal Compteur indisponible.");
+      }
+    };
+
+    // ÉTAPE 2 : Synchronisation des Documents Sheets (Canal B)
+    const fetchDocs = async () => {
+      try {
+        const data = await storageService.fetchFromSheets();
+        if (data.documents.length > 0) {
+          setCategories(data.categories);
+          setDocuments(data.documents);
+        }
+      } catch (err) {
+        console.error("Échec du Canal Documents:", err);
+      }
+    };
+
+    // Exécution en parallèle
+    await Promise.all([fetchCounter(), fetchDocs()]);
+
+    setIsSyncing(false);
   };
 
   useEffect(() => {
@@ -88,7 +115,7 @@ const App: React.FC = () => {
 
     if (navigationPath.length === 0) return [];
     const lastCatId = navigationPath[navigationPath.length - 1].id;
-    return documents.filter(doc => doc.categoryId === lastCatId && doc.fileUrl !== '');
+    return documents.filter(doc => doc.categoryId === lastCatId);
   }, [documents, navigationPath, searchQuery, viewMode]);
 
   const initiateDownload = (doc: Document) => {
@@ -101,7 +128,7 @@ const App: React.FC = () => {
 
   const processDownload = (email: string, doc: Document) => {
     if (storageService.isEmailBanned(email)) {
-      alert("⚠️ ACCÈS RÉVOQUÉ : Votre identité a été proscrite de la Matrice Polaris.");
+      alert("⚠️ ACCÈS RÉVOQUÉ PAR LA MATRICE");
       return;
     }
     storageService.logDownload(email, doc.title, doc.id);
@@ -110,18 +137,15 @@ const App: React.FC = () => {
     
     const newXP = storageService.addXP(10);
     setUserXP(newXP);
-    
     setViewerDoc(doc);
   };
 
   const handleIdentityConfirm = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userEmail.includes('@')) { setEmailError('Email invalide'); return; }
-    if (pendingDoc) {
+    if (pendingDoc && userEmail.includes('@')) {
       storageService.saveUserEmail(userEmail);
       processDownload(userEmail, pendingDoc);
       setShowEmailModal(false);
-      setEmailError('');
     }
   };
 
@@ -131,21 +155,15 @@ const App: React.FC = () => {
     const user = accounts.find(a => a.username.toLowerCase() === adminUsername.toLowerCase());
     
     let isAuthorized = false;
-    if (adminUsername.toLowerCase() === 'astarté' && adminPassword === '2008') {
-      isAuthorized = true;
-    } 
-    else if (adminUsername.toLowerCase() === 'léon' && adminPassword === 'mazedxn7') {
-      isAuthorized = true;
-    }
+    if (adminUsername.toLowerCase() === 'astarté' && adminPassword === '2008') isAuthorized = true;
+    else if (adminUsername.toLowerCase() === 'léon' && adminPassword === 'mazedxn7') isAuthorized = true;
     
     if (isAuthorized && user) {
       setIsAdminMode(true);
       setCurrentAdmin(user);
       setShowAdminLogin(false);
-      setLoginError(false);
       setAdminUsername('');
       setAdminPassword('');
-      storageService.addLog('AUTH', `Éveil système pour ${user.username}`);
     } else {
       setLoginError(true);
       setTimeout(() => setLoginError(false), 3000);
@@ -174,15 +192,14 @@ const App: React.FC = () => {
            </div>
 
            <div className="flex items-center gap-4">
-              {/* NOUVEAU COMPTEUR DANS LE HEADER */}
-              <div className="bg-slate-950/60 backdrop-blur-2xl border border-cyan-500/20 p-4 rounded-[2rem] flex items-center gap-5 shadow-2xl border-l-cyan-500/50">
+              <div id="affichage-stats" className="bg-slate-950/60 backdrop-blur-2xl border border-cyan-500/20 p-4 rounded-[2rem] flex items-center gap-5 shadow-2xl border-l-cyan-500/50">
                  <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center border border-cyan-400/20 shadow-neon">
                     <i className="fas fa-folder-open text-cyan-400 text-sm"></i>
                  </div>
                  <div className="flex flex-col">
                     <p className="text-[7px] font-black uppercase text-cyan-400/60 tracking-[0.2em]">Base de données</p>
                     <p className="text-[14px] font-black text-white uppercase tracking-tight">
-                       {totalCount} <span className="text-[9px] text-white/40">Archives</span>
+                       <span id="chiffre-compteur">{totalCount}</span> <span className="text-[9px] text-white/40">Archives</span>
                     </p>
                  </div>
               </div>
@@ -216,12 +233,9 @@ const App: React.FC = () => {
       <main className="container mx-auto px-6 lg:px-24 relative z-10">
         {isAdminMode ? (
           <div className="animate-in">
-            <div className="flex justify-between items-center mb-8">
-               <button onClick={() => setIsAdminMode(false)} className="text-[10px] font-black uppercase tracking-widest text-cyan-400 flex items-center gap-3">
-                  <i className="fas fa-arrow-left"></i> Quitter le Terminal
-               </button>
-               <span className="text-[10px] font-black uppercase text-white/30 italic tracking-widest">Opérateur Némésis : {currentAdmin?.username}</span>
-            </div>
+            <button onClick={() => setIsAdminMode(false)} className="text-[10px] font-black uppercase tracking-widest text-cyan-400 mb-8 flex items-center gap-3">
+              <i className="fas fa-arrow-left"></i> Quitter le Terminal
+            </button>
             <AdminDashboard categories={categories} documents={documents} currentAdmin={currentAdmin} onRefresh={syncData} />
           </div>
         ) : (
@@ -237,7 +251,7 @@ const App: React.FC = () => {
               </nav>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+            <div id="affichage-liste" className="grid grid-cols-1 lg:grid-cols-12 gap-12">
               {viewMode === 'archives' && !searchQuery && currentLevelCategories.length > 0 && (
                 <div className="lg:col-span-4 space-y-6">
                   {currentLevelCategories.map(cat => (
@@ -253,8 +267,9 @@ const App: React.FC = () => {
                   displayedDocuments.map(doc => <DocumentCard key={doc.id} doc={doc} onDownload={initiateDownload} />)
                 ) : (
                   <div className="col-span-full py-24 text-center">
+                     <i className="fas fa-box-open text-white/5 text-5xl mb-6"></i>
                      <p className="text-white/10 text-[10px] font-black uppercase tracking-[1em]">
-                        {viewMode === 'library' ? "Votre bibliothèque est vide" : "Aucune archive matérialisée"}
+                        {viewMode === 'library' ? "Bibliothèque vide" : "Aucune archive trouvée"}
                      </p>
                   </div>
                 )}
@@ -265,13 +280,8 @@ const App: React.FC = () => {
       </main>
 
       <footer className="fixed bottom-0 left-0 w-full py-4 px-12 bg-slate-950/90 backdrop-blur-3xl border-t border-white/5 flex items-center justify-between z-[1000]">
-        <p className="text-[8px] text-white/30 font-black uppercase tracking-[0.4em]">SuccessPolaris — Palais v1.5.0</p>
-        <button 
-          onClick={() => setShowAdminLogin(true)} 
-          className="text-[8px] text-white/20 font-black uppercase tracking-widest hover:text-cyan-400 transition-all cursor-pointer outline-none"
-        >
-          DÉVELOPPÉ PAR ASTARTÉ MEMBRE DE NÉMÉSIS
-        </button>
+        <p className="text-[8px] text-white/30 font-black uppercase tracking-[0.4em]">SuccessPolaris — Palais v1.8.0 (Live Sheets Sync)</p>
+        <button onClick={() => setShowAdminLogin(true)} className="text-[8px] text-white/20 font-black uppercase tracking-widest hover:text-cyan-400 transition-all">DÉVELOPPÉ PAR ASTARTÉ</button>
       </footer>
 
       {showEmailModal && (
@@ -279,8 +289,8 @@ const App: React.FC = () => {
           <div className="max-w-[420px] w-full p-12 bg-slate-900/60 border border-white/15 rounded-[4rem] relative shadow-3xl">
             <h3 className="text-center text-sm font-black text-white uppercase italic tracking-[0.4em] mb-10">Accès Polaris</h3>
             <form onSubmit={handleIdentityConfirm} className="space-y-8">
-              <input type="email" required placeholder="votre@gmail.com" value={userEmail} onChange={e => setUserEmail(e.target.value)} className="w-full bg-black/70 border border-white/10 rounded-[1.8rem] px-8 py-6 text-white text-center font-black outline-none focus:border-cyan-400 shadow-[0_0_20px_rgba(0,212,255,0.05)]" />
-              <button type="submit" className="w-full bg-cyan-500 hover:bg-white text-slate-950 font-black py-7 rounded-[1.8rem] uppercase text-[11px] tracking-[0.5em] transition-all shadow-neon">S'identifier dans la Matrice</button>
+              <input type="email" required placeholder="votre@gmail.com" value={userEmail} onChange={e => setUserEmail(e.target.value)} className="w-full bg-black/70 border border-white/10 rounded-[1.8rem] px-8 py-6 text-white text-center font-black outline-none focus:border-cyan-400" />
+              <button type="submit" className="w-full bg-cyan-500 text-slate-950 font-black py-7 rounded-[1.8rem] uppercase text-[11px] tracking-[0.5em] shadow-neon">S'identifier</button>
             </form>
           </div>
         </div>
@@ -288,19 +298,13 @@ const App: React.FC = () => {
 
       {showAdminLogin && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/98 backdrop-blur-3xl p-6">
-          <div className="max-w-[380px] w-full p-12 bg-slate-900/50 border-2 border-cyan-500/20 rounded-[4rem] relative shadow-[0_0_100px_rgba(0,212,255,0.1)]">
+          <div className="max-w-[380px] w-full p-12 bg-slate-900/50 border-2 border-cyan-500/20 rounded-[4rem] relative shadow-neon">
             <button onClick={() => setShowAdminLogin(false)} className="absolute top-10 right-10 text-white/20 hover:text-white text-2xl">×</button>
             <form onSubmit={handleAdminLogin} className="space-y-8 text-center">
-              <div className="mb-6">
-                 <div className="w-16 h-16 bg-cyan-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-cyan-500/30">
-                    <i className="fas fa-terminal text-cyan-400 animate-pulse"></i>
-                 </div>
-                 <h3 className="text-white font-black uppercase tracking-[0.4em] italic">Terminal Nemesis</h3>
-              </div>
               <input type="text" placeholder="Utilisateur" value={adminUsername} onChange={e => setAdminUsername(e.target.value)} className="w-full bg-black/80 border border-white/10 rounded-[1.8rem] px-8 py-6 text-white text-center font-black outline-none focus:border-cyan-400" />
-              <input type="password" placeholder="Code d'Accès" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} className="w-full bg-black/80 border border-white/10 rounded-[1.8rem] px-8 py-6 text-white text-center font-black outline-none focus:border-cyan-400" />
-              {loginError && <p className="text-red-500 text-[9px] font-black uppercase animate-bounce">Autorisation refusée</p>}
-              <button type="submit" className="w-full bg-white text-slate-950 font-black py-7 rounded-[1.8rem] uppercase tracking-[0.4em] hover:bg-cyan-500 transition-all shadow-xl">Se Connecter</button>
+              <input type="password" placeholder="Code" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} className="w-full bg-black/80 border border-white/10 rounded-[1.8rem] px-8 py-6 text-white text-center font-black outline-none focus:border-cyan-400" />
+              {loginError && <p className="text-red-500 text-[9px] font-black uppercase">Échec</p>}
+              <button type="submit" className="w-full bg-white text-slate-950 font-black py-7 rounded-[1.8rem] uppercase tracking-[0.4em] shadow-xl">Entrer</button>
             </form>
           </div>
         </div>
@@ -309,7 +313,7 @@ const App: React.FC = () => {
       {isSyncing && (
         <div className="fixed inset-0 z-[20000] flex flex-col items-center justify-center bg-slate-950/98 backdrop-blur-3xl">
            <div className="w-20 h-20 border-2 border-t-cyan-500 rounded-full animate-spin"></div>
-           <p className="text-cyan-400 text-[9px] font-black uppercase tracking-[1.5em] mt-10 animate-pulse">Réception des flux stellaires...</p>
+           <p className="text-cyan-400 text-[9px] font-black uppercase tracking-[1.5em] mt-10">Synchronisation Matrice...</p>
         </div>
       )}
     </div>

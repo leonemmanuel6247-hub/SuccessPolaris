@@ -2,8 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { storageService } from '../services/storageService.ts';
 import { Category, Document, VisitorActivity, AdminAccount } from '../types.ts';
-import { GOOGLE_SHEET_ID } from '../constants.ts';
-import DocumentCard from './DocumentCard.tsx';
 import AdminStats from './AdminStats.tsx';
 
 interface AdminDashboardProps {
@@ -75,7 +73,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
     const catName = targetCat ? targetCat.name.toLowerCase() : 'terminale';
     setGeneratedRow(`"${newItem.title}","${newItem.url.trim()}","${catName}","${newItem.subCat.toLowerCase()}"`);
     setIsPublished(true);
-    storageService.addLog('UPLOAD', `Archive prête : ${newItem.title}`);
+    storageService.addLog('UPLOAD', `Archive formatée : ${newItem.title}`);
   };
 
   const resetWizard = () => {
@@ -84,17 +82,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
     setGeneratedRow('');
     setNewItem({ title: '', url: '', subCat: 'Matière' });
   };
-
-  const appsScriptCode = `function doPost(e) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName("LOGS_ESPION") || ss.insertSheet("LOGS_ESPION");
-  if (sheet.getLastRow() === 0) sheet.appendRow(["Email", "Action", "Fichier", "Date"]);
-  try {
-    var data = JSON.parse(e.postData.contents);
-    sheet.appendRow([data.email, data.action, data.fichier, data.timestamp]);
-    return ContentService.createTextOutput("OK");
-  } catch (err) { return ContentService.createTextOutput("ERR"); }
-}`;
 
   return (
     <div className="bg-slate-950/40 rounded-[2rem] md:rounded-[3rem] border border-white/5 overflow-hidden backdrop-blur-3xl shadow-2xl flex flex-col min-h-[600px]">
@@ -124,13 +111,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
         {activeTab === 'status' && (
           <div className="space-y-8 animate-in">
             <div className="bg-gradient-to-br from-slate-900 to-black p-10 rounded-[2.5rem] border border-white/10 shadow-xl">
-               <h3 className="text-xl font-black text-white uppercase italic mb-6">Matrice Polaris</h3>
-               <p className="text-white/40 text-[11px] uppercase font-bold tracking-[0.3em] mb-8 leading-loose">
-                 Identifiant : <span className="text-cyan-400 font-mono break-all">{GOOGLE_SHEET_ID}</span>
+               <h3 className="text-xl font-black text-white uppercase italic mb-6">Contrôle Polaris</h3>
+               <p className="text-white/40 text-[10px] uppercase font-bold tracking-[0.3em] mb-8 leading-loose">
+                 Statut : <span className="text-emerald-400">Canal A (Compteur) Actif</span><br/>
+                 Statut : <span className="text-amber-400">Documents déconnectés de Sheets</span>
                </p>
                <div className="flex gap-4">
-                  <button onClick={() => window.open(`https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/edit`, '_blank')} className="flex-1 bg-white text-slate-950 py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-cyan-400 transition-all shadow-lg">Éditer Sheets</button>
-                  <button onClick={handleManualSync} disabled={isSyncing} className="flex-1 bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest">{isSyncing ? 'Sync...' : 'Forcer Sync'}</button>
+                  <button onClick={handleManualSync} disabled={isSyncing} className="w-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest">{isSyncing ? 'Sync Compteur...' : 'Rafraîchir Compteur'}</button>
                </div>
             </div>
           </div>
@@ -143,7 +130,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
             <div className="bg-white/[0.03] border border-white/10 rounded-[3.5rem] p-10 relative overflow-hidden backdrop-blur-3xl">
                {isPublished ? (
                  <div className="space-y-10 animate-in text-center">
-                    <h3 className="text-white font-black uppercase tracking-[0.3em] text-2xl italic">ARCHIVE PRÊTE</h3>
+                    <h3 className="text-white font-black uppercase tracking-[0.3em] text-2xl italic">FORMATAGE ARCHIVE</h3>
+                    <p className="text-[10px] text-white/40 uppercase font-black">Copiez cette ligne pour votre index interne</p>
                     <div className="bg-black/90 rounded-[2rem] p-8 border border-cyan-500/30 font-mono text-cyan-400 break-all select-all text-[12px]">
                         {generatedRow}
                     </div>
@@ -151,7 +139,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
                  </div>
                ) : (
                  <div className="space-y-10">
-                   {publishStep === 0 && <button onClick={() => setPublishStep(1)} className="w-full bg-indigo-500/10 border border-indigo-500/30 p-14 rounded-[3rem] hover:bg-indigo-500 transition-all group font-black uppercase tracking-widest text-[12px] text-white">Matérialiser Document</button>}
+                   {publishStep === 0 && <button onClick={() => setPublishStep(1)} className="w-full bg-indigo-500/10 border border-indigo-500/30 p-14 rounded-[3rem] hover:bg-indigo-500 transition-all group font-black uppercase tracking-widest text-[12px] text-white">Préparer une Nouvelle Archive</button>}
                    {publishStep === 1 && <div className="space-y-8 animate-in"><input type="text" placeholder="Lien Drive..." value={newItem.url} onChange={e => setNewItem({...newItem, url: e.target.value})} className="w-full bg-black/60 border border-white/10 rounded-2xl p-6 text-white text-center outline-none focus:border-cyan-400" /><button onClick={() => setPublishStep(2)} className="w-full bg-white text-slate-950 py-5 rounded-2xl text-[10px] font-black uppercase">Suivant</button></div>}
                    {publishStep === 2 && <div className="space-y-8 animate-in"><input type="text" placeholder="Titre..." value={newItem.title} onChange={e => setNewItem({...newItem, title: e.target.value})} className="w-full bg-black/60 border border-white/10 rounded-2xl p-6 text-white text-center outline-none focus:border-cyan-400" /><button onClick={() => setPublishStep(3)} className="w-full bg-white text-slate-950 py-5 rounded-2xl text-[10px] font-black uppercase">Suivant</button></div>}
                    {publishStep === 3 && (
@@ -163,7 +151,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
                        <button onClick={() => setPublishStep(4)} className="w-full bg-white text-slate-950 py-5 rounded-2xl text-[10px] font-black uppercase">Suivant</button>
                      </div>
                    )}
-                   {publishStep === 4 && <div className="space-y-8 animate-in"><input type="text" placeholder="Matière..." value={newItem.subCat} onChange={e => setNewItem({...newItem, subCat: e.target.value})} className="w-full bg-black/60 border border-white/10 rounded-2xl p-6 text-white text-center outline-none focus:border-cyan-400" /><button onClick={handleFinalPublish} className="w-full bg-cyan-500 text-slate-950 py-7 rounded-[2.5rem] text-[12px] font-black uppercase tracking-[0.5em]">PUBLIER</button></div>}
+                   {publishStep === 4 && <div className="space-y-8 animate-in"><input type="text" placeholder="Matière..." value={newItem.subCat} onChange={e => setNewItem({...newItem, subCat: e.target.value})} className="w-full bg-black/60 border border-white/10 rounded-2xl p-6 text-white text-center outline-none focus:border-cyan-400" /><button onClick={handleFinalPublish} className="w-full bg-cyan-500 text-slate-950 py-7 rounded-[2.5rem] text-[12px] font-black uppercase tracking-[0.5em]">GÉNÉRER</button></div>}
                  </div>
                )}
             </div>
@@ -172,11 +160,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
 
         {activeTab === 'spy' && (
           <div className="space-y-12 animate-in">
-             <div className="bg-indigo-500/5 p-8 rounded-[2rem] border border-indigo-500/20">
-                <p className="text-[10px] text-white/40 uppercase font-black mb-6 leading-relaxed">Collez ce code dans "Extensions &gt; Apps Script" de votre Sheet pour activer le tracking.</p>
-                <pre className="bg-black/80 p-6 rounded-2xl text-[10px] font-mono text-cyan-500/80 overflow-x-auto border border-white/5 select-all">{appsScriptCode}</pre>
-             </div>
-
              <div className="bg-black/40 rounded-[2rem] border border-white/5 p-6 overflow-x-auto shadow-2xl">
                 <table className="w-full text-left">
                     <thead><tr className="text-[8px] uppercase font-black text-white/20 tracking-[0.4em] border-b border-white/10"><th className="pb-4">Visiteur</th><th className="pb-4">Action</th><th className="pb-4 text-right">Contrôle</th></tr></thead>

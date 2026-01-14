@@ -7,16 +7,18 @@ export const THEME = {
   glacialWhite: '#e6f1ff',
   vividViolet: '#7b4dff',
   glassBorder: 'rgba(255, 255, 255, 0.05)',
-  glassBg: 'rgba(15, 23, 42, 0.6)'
+  glassBg: 'rgba(15, 23, 42, 0.6)',
+  neonRed: '#FF003C'
 };
 
-// --- CONFIGURATION DYNAMIQUE ---
-export const GOOGLE_SHEET_ID = '1fg-tStXc8E04WLqkHxDfrEJR7yf6ix0uzL4y52HF0k0'; 
+// --- CONFIGURATION DYNAMIQUE POLARIS ---
+// URL A : Canal de comptage (JSON)
+export const URL_COMPTEUR = 'https://script.google.com/macros/s/AKfycbCiCf6TonxpoZ7RjacHCEIg6hl0D0ImulJvqsbkF1jMhEA_U5nWTfrdWbl5sWQdT3B/exec';
 
-// URL de l'API JSON de comptage
-export const COUNT_API_URL = 'https://script.google.com/macros/s/AKfycbyjVzDHEU4JQzMMGdR-Mt3ZbXpq6t4LXFveQbFWNUy0mgKunLN628Ia0Is3nJJu1ast/exec';
+// URL B : Canal de données (CSV Export)
+export const URL_LISTE_DOCUMENTS = 'https://docs.google.com/spreadsheets/d/1fg-tStXc8E04WLqkHxDfrEJR7yf6ix0uzL4y52HF0k0/export?format=csv';
 
-// URL du Webhook Google Apps Script final pour les logs
+// URL C : Webhook de traçage (Logs)
 export const APPS_SCRIPT_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbxsxCg3mvJsSFSTDK-2q7yViH0jhCr1TH4yELAGl2j7NUoykvJzVG_hyQRSXUSmfDDf/exec';
 
 export const INITIAL_CATEGORIES: Category[] = [];

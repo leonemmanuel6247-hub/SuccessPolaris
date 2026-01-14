@@ -1,6 +1,6 @@
 
-import { Category, Document, AdminAccount, VisitorActivity, UserProfile } from '../types.ts';
-import { GOOGLE_SHEET_ID, APPS_SCRIPT_WEBHOOK_URL, COUNT_API_URL } from '../constants.ts';
+import { Category, Document, AdminAccount, VisitorActivity } from '../types.ts';
+import { URL_COMPTEUR, URL_LISTE_DOCUMENTS, APPS_SCRIPT_WEBHOOK_URL } from '../constants.ts';
 
 const KEYS = {
   CATEGORIES: 'sp_categories',
@@ -9,7 +9,6 @@ const KEYS = {
   LOGS: 'sp_logs',
   VISITOR_ACTIVITY: 'sp_visitor_spy_logs',
   ACCOUNTS: 'sp_admin_accounts',
-  LAST_SYNC: 'sp_last_sync',
   USER_EMAIL: 'sp_user_identity',
   BANNED_EMAILS: 'sp_banned_list',
   USER_XP: 'sp_user_xp',
@@ -18,53 +17,52 @@ const KEYS = {
 };
 
 const parseCSV = (csv: string) => {
-  const lines = csv.split('\n').filter(line => line.trim() !== '');
-  if (lines.length <= 1) return { rows: [], totalCount: 0 };
+  const lines = csv.split(/\r?\n/).filter(line => line.trim() !== '');
+  if (lines.length <= 1) return [];
   
-  const totalCount = lines.length - 1;
-
-  const rows = lines.slice(1).map((line, index) => {
+  return lines.slice(1).map((line, index) => {
+    // Regex pour gérer les virgules à l'intérieur des guillemets
     const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.trim().replace(/^"|"$/g, ''));
     return {
       title: values[0] || '',
       url: values[1] || '',
-      category: values[2] || '',
-      subCategory: values[3] || '',
-      date: values[4] || new Date().toISOString(),
-      id: `doc-${index}`
+      category: (values[2] || '').toLowerCase(), // Colonne C
+      subCategory: (values[3] || '').toLowerCase(), // Colonne D
+      date: values[4] || new Date().toISOString(), // Colonne E
+      id: `doc-${index}-${Date.now()}`
     };
   });
-
-  return { rows, totalCount };
 };
 
 export const storageService = {
-  // Récupère uniquement le total via l'API JSON rapide
-  fetchGlobalTotal: async (): Promise<number> => {
+  // FONCTION A : Isolation du Compteur
+  chargerCompteur: async (): Promise<number> => {
     try {
-      const response = await fetch(COUNT_API_URL);
+      const response = await fetch(`${URL_COMPTEUR}?t=${Date.now()}`);
       if (!response.ok) throw new Error();
       const data = await response.json();
-      return data.total || 0;
+      
+      const el = document.getElementById('chiffre-compteur');
+      if (el) el.textContent = data.total;
+      
+      localStorage.setItem(KEYS.SHEET_ROW_COUNT, data.total.toString());
+      return parseInt(data.total) || 0;
     } catch (e) {
-      return parseInt(localStorage.getItem(KEYS.SHEET_ROW_COUNT) || '0');
+      const cached = localStorage.getItem(KEYS.SHEET_ROW_COUNT) || '0';
+      const el = document.getElementById('chiffre-compteur');
+      if (el) el.textContent = cached;
+      return parseInt(cached);
     }
   },
 
-  fetchFromSheets: async (): Promise<{ categories: Category[], documents: Document[], totalCount: number }> => {
+  // FONCTION B : Importation de la liste des documents
+  fetchFromSheets: async (): Promise<{ categories: Category[], documents: Document[] }> => {
     try {
-      const timestamp = new Date().getTime();
-      const csvUrl = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/pub?output=csv&t=${timestamp}`;
-      
-      const response = await fetch(csvUrl);
-      if (!response.ok) throw new Error('Matrice Polaris injoignable');
+      const response = await fetch(`${URL_LISTE_DOCUMENTS}&t=${Date.now()}`);
+      if (!response.ok) throw new Error('Source inaccessible');
       
       const csvData = await response.text();
-      const { rows, totalCount: csvTotal } = parseCSV(csvData);
-
-      // On tente de récupérer un total plus précis via l'API JSON
-      const apiTotal = await storageService.fetchGlobalTotal();
-      const finalTotal = apiTotal > 0 ? apiTotal : csvTotal;
+      const rows = parseCSV(csvData);
 
       const categories: Category[] = [];
       const documents: Document[] = [];
@@ -72,49 +70,53 @@ export const storageService = {
 
       rows.forEach(row => {
         if (!row.title || !row.url || !row.category) return;
-        const mainCatName = row.category.trim().toUpperCase();
-        const subCatName = row.subCategory ? row.subCategory.trim().toUpperCase() : null;
 
-        if (!categoryMap.has(mainCatName)) {
-          const catId = `cat-${mainCatName.replace(/\s+/g, '-')}`;
-          categoryMap.set(mainCatName, catId);
-          categories.push({ id: catId, name: mainCatName, parentId: null, icon: '🪐' });
+        const mainCatLabel = row.category.toUpperCase();
+        const subCatLabel = row.subCategory ? row.subCategory.toUpperCase() : null;
+
+        // Création de la catégorie parente (Terminale, etc.)
+        if (!categoryMap.has(mainCatLabel)) {
+          const catId = `cat-${mainCatLabel.replace(/\s+/g, '-')}`;
+          categoryMap.set(mainCatLabel, catId);
+          categories.push({ id: catId, name: mainCatLabel, parentId: null, icon: '📁' });
         }
-        let currentParentId = categoryMap.get(mainCatName)!;
-        if (subCatName) {
-          const subKey = `${mainCatName}_${subCatName}`;
+
+        let finalCatId = categoryMap.get(mainCatLabel)!;
+
+        // Création de la sous-catégorie (Maths, etc.)
+        if (subCatLabel) {
+          const subKey = `${mainCatLabel}_${subCatLabel}`;
           if (!categoryMap.has(subKey)) {
             const subId = `sub-${subKey.replace(/\s+/g, '-')}`;
             categoryMap.set(subKey, subId);
-            categories.push({ id: subId, name: subCatName, parentId: currentParentId, icon: '📚' });
+            categories.push({ id: subId, name: subCatLabel, parentId: finalCatId, icon: '📖' });
           }
-          currentParentId = categoryMap.get(subKey)!;
+          finalCatId = categoryMap.get(subKey)!;
         }
+
         documents.push({
           id: row.id,
           title: row.title,
-          description: `Archive classée en ${mainCatName}${subCatName ? ' > ' + subCatName : ''}`,
-          categoryId: currentParentId,
+          description: `Archive ${mainCatLabel} > ${subCatLabel || 'Général'}`,
+          categoryId: finalCatId,
           fileUrl: row.url, 
           fileType: 'pdf',
-          tags: [mainCatName],
+          tags: [mainCatLabel],
           downloads: 0,
           dateAdded: row.date,
-          size: 'Auto'
+          size: 'PDF'
         });
       });
 
       localStorage.setItem(KEYS.DOCUMENTS, JSON.stringify(documents));
       localStorage.setItem(KEYS.CATEGORIES, JSON.stringify(categories));
-      localStorage.setItem(KEYS.SHEET_ROW_COUNT, finalTotal.toString());
-      localStorage.setItem(KEYS.LAST_SYNC, new Date().toISOString());
       
-      return { categories, documents, totalCount: finalTotal };
+      return { categories, documents };
     } catch (error) {
+      console.error("Erreur de récupération des documents:", error);
       return { 
         categories: JSON.parse(localStorage.getItem(KEYS.CATEGORIES) || '[]'), 
-        documents: JSON.parse(localStorage.getItem(KEYS.DOCUMENTS) || '[]'),
-        totalCount: parseInt(localStorage.getItem(KEYS.SHEET_ROW_COUNT) || '0')
+        documents: JSON.parse(localStorage.getItem(KEYS.DOCUMENTS) || '[]')
       };
     }
   },
@@ -149,7 +151,6 @@ export const storageService = {
     const banned = storageService.getBannedEmails();
     if (!banned.includes(email)) {
       localStorage.setItem(KEYS.BANNED_EMAILS, JSON.stringify([...banned, email]));
-      storageService.addLog('BAN', `Email banni : ${email}`);
     }
   },
 
@@ -157,7 +158,6 @@ export const storageService = {
     const banned = storageService.getBannedEmails();
     const filtered = banned.filter(e => e !== email);
     localStorage.setItem(KEYS.BANNED_EMAILS, JSON.stringify(filtered));
-    storageService.addLog('BAN', `Email débanni : ${email}`);
   },
 
   sendToCloudLog: async (email: string, fileName: string, action: string = 'Téléchargement') => {
@@ -245,7 +245,6 @@ export const storageService = {
     const newAct = { id: `d-${Date.now()}`, type: 'DOWNLOAD', email, fileName, timestamp: new Date().toLocaleString() };
     localStorage.setItem(KEYS.VISITOR_ACTIVITY, JSON.stringify([newAct, ...activities].slice(0, 500)));
     
-    // Historique local
     if (docId) {
       const history = JSON.parse(localStorage.getItem(KEYS.USER_HISTORY) || '[]');
       if (!history.includes(docId)) {

@@ -17,11 +17,13 @@ const DocumentCard: React.FC<DocumentCardProps> = ({ doc, onDownload }) => {
   };
 
   const isNew = () => {
-    const docDate = new Date(doc.dateAdded);
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - docDate.getTime());
-    const diffHours = diffTime / (1000 * 60 * 60);
-    return diffHours <= 24; // Badge actif pendant 24 heures seulement
+    try {
+      const docDate = new Date(doc.dateAdded);
+      const now = new Date();
+      const diffTime = Math.abs(now.getTime() - docDate.getTime());
+      const diffHours = diffTime / (1000 * 60 * 60);
+      return diffHours <= 48; // Badge actif pendant 48 heures (Règle Commandant)
+    } catch (e) { return false; }
   };
 
   return (
@@ -36,7 +38,7 @@ const DocumentCard: React.FC<DocumentCardProps> = ({ doc, onDownload }) => {
           <div className="flex flex-col items-end">
              <span className="text-[8px] text-cyan-400 font-black uppercase tracking-widest">{doc.size || 'N/A'}</span>
              {isNew() && (
-               <span className="mt-2 bg-cyan-500 text-slate-950 text-[7px] font-black px-2 py-0.5 rounded-full animate-pulse shadow-neon">NEW</span>
+               <span className="mt-2 bg-[#FF003C] text-white text-[7px] font-black px-3 py-1 rounded-full animate-pulse shadow-[0_0_15px_rgba(255,0,60,0.6)] uppercase tracking-wider">NOUVEAU</span>
              )}
           </div>
         </div>
