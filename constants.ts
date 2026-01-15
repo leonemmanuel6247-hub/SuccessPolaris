@@ -12,8 +12,8 @@ export const THEME = {
 };
 
 // --- CONFIGURATION DYNAMIQUE POLARIS ---
-// URL A : Canal de comptage (JSON)
-export const URL_COMPTEUR = 'https://script.google.com/macros/s/AKfycbCiCf6TonxpoZ7RjacHCEIg6hl0D0ImulJvqsbkF1jMhEA_U5nWTfrdWbl5sWQdT3B/exec';
+// URL A : Canal de comptage (JSON/Text) - URL Mise à jour selon instructions
+export const URL_COMPTEUR = 'https://script.google.com/macros/s/AKfycbzCiCf6TonxpoZ7RjacHCEIg6hl0D0ImulJvqsbkF1jMhEA_U5nWTfrdWbl5sWQdT3B/exec';
 
 // URL B : Canal de données (CSV Export)
 export const URL_LISTE_DOCUMENTS = 'https://docs.google.com/spreadsheets/d/1fg-tStXc8E04WLqkHxDfrEJR7yf6ix0uzL4y52HF0k0/export?format=csv';

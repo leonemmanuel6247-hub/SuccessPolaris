@@ -30,10 +30,21 @@ const App: React.FC = () => {
   const [viewerDoc, setViewerDoc] = useState<Document | null>(null);
   const [userEmail, setUserEmail] = useState('');
 
-  const syncData = async () => {
+  // CANAL A : Synchronisation isolée du Compteur (FIRE AND FORGET)
+  const syncCounter = async () => {
+    try {
+      const count = await storageService.chargerCompteur();
+      if (count !== undefined) setTotalCount(count);
+    } catch (e) {
+      console.warn("Échec silencieux du Canal Compteur - Isolation préservée.");
+    }
+  };
+
+  // CANAL B : Synchronisation des Documents (Priorité Affichage)
+  const syncDocs = async () => {
     setIsSyncing(true);
     
-    // ÉTAPE 0 : Chargement immédiat du cache local pour une réactivité instantanée
+    // 1. Chargement instantané depuis le cache local
     const cachedDocs = localStorage.getItem('sp_documents');
     const cachedCats = localStorage.getItem('sp_categories');
     const cachedCount = localStorage.getItem('sp_document_total_count');
@@ -42,39 +53,28 @@ const App: React.FC = () => {
       setDocuments(JSON.parse(cachedDocs));
       setCategories(JSON.parse(cachedCats));
       setTotalCount(parseInt(cachedCount || '0'));
+      // On libère déjà l'interface si on a du cache
+      setIsSyncing(false); 
     }
 
-    // ÉTAPE 1 : Synchronisation du Compteur (Canal A)
-    const fetchCounter = async () => {
-      try {
-        const count = await storageService.chargerCompteur();
-        setTotalCount(count);
-      } catch (e) {
-        console.warn("Canal Compteur indisponible.");
+    try {
+      const data = await storageService.fetchFromSheets();
+      if (data.documents.length > 0) {
+        setCategories(data.categories);
+        setDocuments(data.documents);
       }
-    };
-
-    // ÉTAPE 2 : Synchronisation des Documents Sheets (Canal B)
-    const fetchDocs = async () => {
-      try {
-        const data = await storageService.fetchFromSheets();
-        if (data.documents.length > 0) {
-          setCategories(data.categories);
-          setDocuments(data.documents);
-        }
-      } catch (err) {
-        console.error("Échec du Canal Documents:", err);
-      }
-    };
-
-    // Exécution en parallèle
-    await Promise.all([fetchCounter(), fetchDocs()]);
-
-    setIsSyncing(false);
+    } catch (err) {
+      console.error("Échec du rafraîchissement des documents:", err);
+    } finally {
+      setIsSyncing(false); // Libération finale du loader
+    }
   };
 
   useEffect(() => {
-    syncData();
+    // Lancement parallèle mais indépendant
+    syncDocs();
+    syncCounter();
+
     storageService.logVisit(); 
     setUserXP(storageService.getUserXP());
     const savedEmail = storageService.getUserEmail();
@@ -236,7 +236,7 @@ const App: React.FC = () => {
             <button onClick={() => setIsAdminMode(false)} className="text-[10px] font-black uppercase tracking-widest text-cyan-400 mb-8 flex items-center gap-3">
               <i className="fas fa-arrow-left"></i> Quitter le Terminal
             </button>
-            <AdminDashboard categories={categories} documents={documents} currentAdmin={currentAdmin} onRefresh={syncData} />
+            <AdminDashboard categories={categories} documents={documents} currentAdmin={currentAdmin} onRefresh={syncDocs} />
           </div>
         ) : (
           <div className="space-y-16 animate-in">
@@ -280,7 +280,7 @@ const App: React.FC = () => {
       </main>
 
       <footer className="fixed bottom-0 left-0 w-full py-4 px-12 bg-slate-950/90 backdrop-blur-3xl border-t border-white/5 flex items-center justify-between z-[1000]">
-        <p className="text-[8px] text-white/30 font-black uppercase tracking-[0.4em]">SuccessPolaris — Palais v1.8.0 (Live Sheets Sync)</p>
+        <p className="text-[8px] text-white/30 font-black uppercase tracking-[0.4em]">SuccessPolaris — Palais v1.8.0 (Isolated Sync)</p>
         <button onClick={() => setShowAdminLogin(true)} className="text-[8px] text-white/20 font-black uppercase tracking-widest hover:text-cyan-400 transition-all">DÉVELOPPÉ PAR ASTARTÉ</button>
       </footer>
 

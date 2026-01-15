@@ -21,41 +21,45 @@ const parseCSV = (csv: string) => {
   if (lines.length <= 1) return [];
   
   return lines.slice(1).map((line, index) => {
-    // Regex pour gérer les virgules à l'intérieur des guillemets
     const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.trim().replace(/^"|"$/g, ''));
     return {
       title: values[0] || '',
       url: values[1] || '',
-      category: (values[2] || '').toLowerCase(), // Colonne C
-      subCategory: (values[3] || '').toLowerCase(), // Colonne D
-      date: values[4] || new Date().toISOString(), // Colonne E
+      category: (values[2] || '').toLowerCase(),
+      subCategory: (values[3] || '').toLowerCase(),
+      date: values[4] || new Date().toISOString(),
       id: `doc-${index}-${Date.now()}`
     };
   });
 };
 
 export const storageService = {
-  // FONCTION A : Isolation du Compteur
+  // FONCTION A : Isolation du Compteur (Version Robuste)
   chargerCompteur: async (): Promise<number> => {
     try {
       const response = await fetch(`${URL_COMPTEUR}?t=${Date.now()}`);
-      if (!response.ok) throw new Error();
-      const data = await response.json();
+      if (!response.ok) throw new Error('Réseau instable');
       
-      const el = document.getElementById('chiffre-compteur');
-      if (el) el.textContent = data.total;
+      const textData = await response.text();
+      let finalCount = 0;
+
+      try {
+        // Tentative 1 : Le script renvoie du JSON { "total": 123 }
+        const jsonData = JSON.parse(textData);
+        finalCount = parseInt(jsonData.total || jsonData.count || 0);
+      } catch (e) {
+        // Tentative 2 : Le script renvoie du texte brut "123"
+        finalCount = parseInt(textData.trim()) || 0;
+      }
       
-      localStorage.setItem(KEYS.SHEET_ROW_COUNT, data.total.toString());
-      return parseInt(data.total) || 0;
+      localStorage.setItem(KEYS.SHEET_ROW_COUNT, finalCount.toString());
+      return finalCount;
     } catch (e) {
-      const cached = localStorage.getItem(KEYS.SHEET_ROW_COUNT) || '0';
-      const el = document.getElementById('chiffre-compteur');
-      if (el) el.textContent = cached;
-      return parseInt(cached);
+      console.warn("Récupération compteur via cache local...");
+      return parseInt(localStorage.getItem(KEYS.SHEET_ROW_COUNT) || '0');
     }
   },
 
-  // FONCTION B : Importation de la liste des documents
   fetchFromSheets: async (): Promise<{ categories: Category[], documents: Document[] }> => {
     try {
       const response = await fetch(`${URL_LISTE_DOCUMENTS}&t=${Date.now()}`);
@@ -74,7 +78,6 @@ export const storageService = {
         const mainCatLabel = row.category.toUpperCase();
         const subCatLabel = row.subCategory ? row.subCategory.toUpperCase() : null;
 
-        // Création de la catégorie parente (Terminale, etc.)
         if (!categoryMap.has(mainCatLabel)) {
           const catId = `cat-${mainCatLabel.replace(/\s+/g, '-')}`;
           categoryMap.set(mainCatLabel, catId);
@@ -83,7 +86,6 @@ export const storageService = {
 
         let finalCatId = categoryMap.get(mainCatLabel)!;
 
-        // Création de la sous-catégorie (Maths, etc.)
         if (subCatLabel) {
           const subKey = `${mainCatLabel}_${subCatLabel}`;
           if (!categoryMap.has(subKey)) {
@@ -113,7 +115,6 @@ export const storageService = {
       
       return { categories, documents };
     } catch (error) {
-      console.error("Erreur de récupération des documents:", error);
       return { 
         categories: JSON.parse(localStorage.getItem(KEYS.CATEGORIES) || '[]'), 
         documents: JSON.parse(localStorage.getItem(KEYS.DOCUMENTS) || '[]')
