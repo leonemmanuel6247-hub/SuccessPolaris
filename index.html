@@ -5,6 +5,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SuccessPolaris - Majestueuse Voie du Savoir</title>
+    
+    <!-- SEO & Accessibilité IA -->
+    <meta name="description" content="SuccessPolaris : Le Palais Astral des archives scolaires. Accédez aux meilleurs PDF et cours pour réussir vos examens. Plateforme de révision futuriste par Astarté.">
+    <meta name="keywords" content="cours, PDF, révisions, examens, BAC 2025, succès, école, SuccessPolaris, archives scolaires">
+    <meta name="author" content="Astarté - Polaris Network">
+    <meta property="og:title" content="SuccessPolaris - Palais Astral du Savoir">
+    <meta property="og:description" content="Débloquez votre potentiel avec nos archives sécurisées.">
+    <meta property="og:type" content="website">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -27,30 +36,26 @@
             }
         }
 
-        // --- PROTOCOLES DE SÉCURITÉ NÉMÉSIS (VERSION ULTIME) ---
-        
-        // 1. Blocage des interactions basiques
+        // --- PROTOCOLES DE SÉCURITÉ NÉMÉSIS ---
         document.addEventListener('contextmenu', e => e.preventDefault());
         document.addEventListener('dragstart', e => e.preventDefault());
         document.addEventListener('selectstart', e => {
             if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') e.preventDefault();
         });
 
-        // 2. Blocage des raccourcis claviers (Windows/Mac)
         window.addEventListener('keydown', function(e) {
             if (
-                e.keyCode === 123 || // F12
-                (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) || // Ctrl+Shift+I/J/C
-                (e.ctrlKey && e.keyCode === 85) || // Ctrl+U (View Source)
-                (e.ctrlKey && e.keyCode === 83) || // Ctrl+S (Save)
-                (e.metaKey && e.altKey && e.keyCode === 73) // Cmd+Opt+I
+                e.keyCode === 123 || 
+                (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) || 
+                (e.ctrlKey && e.keyCode === 85) || 
+                (e.ctrlKey && e.keyCode === 83) || 
+                (e.metaKey && e.altKey && e.keyCode === 73)
             ) {
                 e.preventDefault();
                 return false;
             }
         });
 
-        // 3. Protection Anti-Debugger & Console
         (function() {
             const block = () => {
                 const start = performance.now();
@@ -67,18 +72,13 @@
                     throw "Accès Interdit";
                 }
             };
-            
-            // Nettoyage console permanent
             setInterval(() => {
                 console.clear();
                 console.log("%cACCÈS RÉSERVÉ À NÉMÉSIS", "color: #00d4ff; font-size: 30px; font-weight: bold;");
             }, 100);
-
-            // Vérification périodique du debugger
             setInterval(block, 500);
         })();
 
-        // 4. Détection de modification du DOM (pour éviter de supprimer les scripts de sécurité)
         const observer = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
                 if (mutation.removedNodes.length) {
@@ -89,7 +89,6 @@
             });
         });
         observer.observe(document.documentElement, { childList: true, subtree: true });
-
     </script>
     <style>
         body {
@@ -98,7 +97,6 @@
             color: #f8fafc;
             margin: 0;
             overflow-x: hidden;
-            /* Protection CSS */
             user-select: none !important;
             -webkit-user-select: none !important;
             -webkit-touch-callout: none !important;
@@ -107,9 +105,7 @@
             user-select: auto !important;
             -webkit-user-select: auto !important;
         }
-        #root {
-            min-height: 100vh;
-        }
+        #root { min-height: 100vh; }
         #loader {
             position: fixed;
             top: 0;
@@ -123,11 +119,7 @@
             z-index: 9999;
             transition: opacity 0.8s ease-in-out;
         }
-        .loader-content {
-            text-align: center;
-            width: 80%;
-            max-width: 400px;
-        }
+        .loader-content { text-align: center; width: 80%; max-width: 400px; }
         .polaris-logo {
             font-size: 3.5rem;
             color: #00d4ff;
@@ -137,11 +129,7 @@
             justify-content: center;
             gap: 15px;
         }
-        .polaris-logo span {
-            font-weight: 900;
-            color: #fff;
-            letter-spacing: -2px;
-        }
+        .polaris-logo span { font-weight: 900; color: #fff; letter-spacing: -2px; }
         #loader h1 {
             color: #fff;
             font-size: 0.8rem;
@@ -170,19 +158,10 @@
             0% { left: -40%; }
             100% { left: 140%; }
         }
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-        .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-        .shadow-neon {
-            box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
-        }
-        .drop-shadow-neon {
-            filter: drop-shadow(0 0 8px rgba(0, 212, 255, 0.6));
-        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .shadow-neon { box-shadow: 0 0 20px rgba(0, 212, 255, 0.3); }
+        .drop-shadow-neon { filter: drop-shadow(0 0 8px rgba(0, 212, 255, 0.6)); }
     </style>
     <script type="importmap">
 {
@@ -205,7 +184,7 @@
                 <i class="fas fa-star animate-pulse"></i>
                 <span>P</span>
             </div>
-            <h1>INITIALISATION POLARIS...</h1>
+            <h1>INITIALISATION NEXUS...</h1>
             <div class="loading-bar">
                 <div class="loading-progress"></div>
             </div>

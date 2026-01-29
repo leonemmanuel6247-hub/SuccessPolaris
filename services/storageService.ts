@@ -34,28 +34,21 @@ const parseCSV = (csv: string) => {
 };
 
 export const storageService = {
-  // FONCTION A : Isolation du Compteur (Version Robuste)
   chargerCompteur: async (): Promise<number> => {
     try {
       const response = await fetch(`${URL_COMPTEUR}?t=${Date.now()}`);
       if (!response.ok) throw new Error('Réseau instable');
-      
       const textData = await response.text();
       let finalCount = 0;
-
       try {
-        // Tentative 1 : Le script renvoie du JSON { "total": 123 }
         const jsonData = JSON.parse(textData);
         finalCount = parseInt(jsonData.total || jsonData.count || 0);
       } catch (e) {
-        // Tentative 2 : Le script renvoie du texte brut "123"
         finalCount = parseInt(textData.trim()) || 0;
       }
-      
       localStorage.setItem(KEYS.SHEET_ROW_COUNT, finalCount.toString());
       return finalCount;
     } catch (e) {
-      console.warn("Récupération compteur via cache local...");
       return parseInt(localStorage.getItem(KEYS.SHEET_ROW_COUNT) || '0');
     }
   },
@@ -64,28 +57,22 @@ export const storageService = {
     try {
       const response = await fetch(`${URL_LISTE_DOCUMENTS}&t=${Date.now()}`);
       if (!response.ok) throw new Error('Source inaccessible');
-      
       const csvData = await response.text();
       const rows = parseCSV(csvData);
-
       const categories: Category[] = [];
       const documents: Document[] = [];
       const categoryMap = new Map<string, string>();
 
       rows.forEach(row => {
         if (!row.title || !row.url || !row.category) return;
-
         const mainCatLabel = row.category.toUpperCase();
         const subCatLabel = row.subCategory ? row.subCategory.toUpperCase() : null;
-
         if (!categoryMap.has(mainCatLabel)) {
           const catId = `cat-${mainCatLabel.replace(/\s+/g, '-')}`;
           categoryMap.set(mainCatLabel, catId);
           categories.push({ id: catId, name: mainCatLabel, parentId: null, icon: '📁' });
         }
-
         let finalCatId = categoryMap.get(mainCatLabel)!;
-
         if (subCatLabel) {
           const subKey = `${mainCatLabel}_${subCatLabel}`;
           if (!categoryMap.has(subKey)) {
@@ -95,7 +82,6 @@ export const storageService = {
           }
           finalCatId = categoryMap.get(subKey)!;
         }
-
         documents.push({
           id: row.id,
           title: row.title,
@@ -109,10 +95,8 @@ export const storageService = {
           size: 'PDF'
         });
       });
-
       localStorage.setItem(KEYS.DOCUMENTS, JSON.stringify(documents));
       localStorage.setItem(KEYS.CATEGORIES, JSON.stringify(categories));
-      
       return { categories, documents };
     } catch (error) {
       return { 
@@ -146,12 +130,17 @@ export const storageService = {
   getUserEmail: () => localStorage.getItem(KEYS.USER_EMAIL),
 
   getBannedEmails: (): string[] => JSON.parse(localStorage.getItem(KEYS.BANNED_EMAILS) || '[]'),
-  isEmailBanned: (email: string): boolean => storageService.getBannedEmails().includes(email),
+  isEmailBanned: (email: string): boolean => {
+    const userEmail = storageService.getUserEmail();
+    const isBanned = storageService.getBannedEmails().includes(email);
+    return isBanned || (userEmail ? storageService.getBannedEmails().includes(userEmail) : false);
+  },
 
   banEmail: (email: string): void => {
     const banned = storageService.getBannedEmails();
     if (!banned.includes(email)) {
       localStorage.setItem(KEYS.BANNED_EMAILS, JSON.stringify([...banned, email]));
+      storageService.addLog('BAN', `Identité bannie : ${email}`);
     }
   },
 
@@ -159,10 +148,17 @@ export const storageService = {
     const banned = storageService.getBannedEmails();
     const filtered = banned.filter(e => e !== email);
     localStorage.setItem(KEYS.BANNED_EMAILS, JSON.stringify(filtered));
+    storageService.addLog('BAN', `Accès rétabli : ${email}`);
   },
 
   sendToCloudLog: async (email: string, fileName: string, action: string = 'Téléchargement') => {
-    const payload = { email, action, fichier: fileName, timestamp: new Date().toLocaleString('fr-FR') };
+    const payload = { 
+      email: email || 'Anonyme', 
+      action, 
+      fichier: fileName, 
+      timestamp: new Date().toLocaleString('fr-FR'),
+      xp_actuel: storageService.getUserXP()
+    };
     try {
       fetch(APPS_SCRIPT_WEBHOOK_URL, {
         method: 'POST',
@@ -186,17 +182,19 @@ export const storageService = {
     return JSON.parse(data);
   },
 
-  addAccount: (username: string, role: 'SUPER_MASTER' | 'MASTER' | 'EDITOR'): void => {
+  // Ajoute un nouveau compte administrateur dans le stockage local
+  addAccount: (username: string, role: AdminAccount['role']): void => {
     const accounts = storageService.getAccounts();
     const newAccount: AdminAccount = {
       id: Date.now().toString(),
       username,
       role,
-      lastLogin: new Date().toISOString()
+      lastLogin: ''
     };
     localStorage.setItem(KEYS.ACCOUNTS, JSON.stringify([...accounts, newAccount]));
   },
 
+  // Révoque un compte administrateur par son identifiant unique
   removeAccount: (id: string): void => {
     const accounts = storageService.getAccounts();
     const filtered = accounts.filter(a => a.id !== id);
@@ -236,9 +234,18 @@ export const storageService = {
   },
 
   logVisit: (): void => {
+    const email = storageService.getUserEmail();
     const activities = JSON.parse(localStorage.getItem(KEYS.VISITOR_ACTIVITY) || '[]');
-    const newAct = { id: `v-${Date.now()}`, type: 'VISIT', timestamp: new Date().toLocaleString() };
+    const newAct = { id: `v-${Date.now()}`, type: 'VISIT', email: email || 'Anonyme', timestamp: new Date().toLocaleString() };
     localStorage.setItem(KEYS.VISITOR_ACTIVITY, JSON.stringify([newAct, ...activities].slice(0, 500)));
+    if (email) storageService.sendToCloudLog(email, 'Site Polaris', 'Visite');
+  },
+
+  logPreview: (email: string | null, fileName: string) => {
+    const activities = JSON.parse(localStorage.getItem(KEYS.VISITOR_ACTIVITY) || '[]');
+    const newAct = { id: `p-${Date.now()}`, type: 'PREVIEW', email: email || 'Anonyme', fileName, timestamp: new Date().toLocaleString() };
+    localStorage.setItem(KEYS.VISITOR_ACTIVITY, JSON.stringify([newAct, ...activities].slice(0, 500)));
+    if (email) storageService.sendToCloudLog(email, fileName, 'Consulter (Aperçu)');
   },
 
   logDownload: (email: string, fileName: string, docId?: string) => {

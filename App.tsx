@@ -30,21 +30,17 @@ const App: React.FC = () => {
   const [viewerDoc, setViewerDoc] = useState<Document | null>(null);
   const [userEmail, setUserEmail] = useState('');
 
-  // CANAL A : Synchronisation isolée du Compteur (FIRE AND FORGET)
   const syncCounter = async () => {
     try {
       const count = await storageService.chargerCompteur();
       if (count !== undefined) setTotalCount(count);
     } catch (e) {
-      console.warn("Échec silencieux du Canal Compteur - Isolation préservée.");
+      console.warn("Échec silencieux du Canal Compteur.");
     }
   };
 
-  // CANAL B : Synchronisation des Documents (Priorité Affichage)
   const syncDocs = async () => {
     setIsSyncing(true);
-    
-    // 1. Chargement instantané depuis le cache local
     const cachedDocs = localStorage.getItem('sp_documents');
     const cachedCats = localStorage.getItem('sp_categories');
     const cachedCount = localStorage.getItem('sp_document_total_count');
@@ -53,7 +49,6 @@ const App: React.FC = () => {
       setDocuments(JSON.parse(cachedDocs));
       setCategories(JSON.parse(cachedCats));
       setTotalCount(parseInt(cachedCount || '0'));
-      // On libère déjà l'interface si on a du cache
       setIsSyncing(false); 
     }
 
@@ -64,22 +59,60 @@ const App: React.FC = () => {
         setDocuments(data.documents);
       }
     } catch (err) {
-      console.error("Échec du rafraîchissement des documents:", err);
+      console.error("Erreur synchro:", err);
     } finally {
-      setIsSyncing(false); // Libération finale du loader
+      setIsSyncing(false);
     }
   };
 
   useEffect(() => {
-    // Lancement parallèle mais indépendant
     syncDocs();
     syncCounter();
-
     storageService.logVisit(); 
     setUserXP(storageService.getUserXP());
     const savedEmail = storageService.getUserEmail();
     if (savedEmail) setUserEmail(savedEmail);
   }, []);
+
+  const handlePreview = (doc: Document) => {
+    const savedEmail = storageService.getUserEmail();
+    storageService.logPreview(savedEmail, doc.title);
+    setViewerDoc(doc);
+  };
+
+  const handleObtain = (doc: Document) => {
+    if (!doc.fileUrl) return;
+    setPendingDoc(doc);
+    const savedEmail = storageService.getUserEmail();
+    if (!savedEmail) {
+      setShowEmailModal(true);
+    } else {
+      processFullAccess(savedEmail, doc);
+    }
+  };
+
+  const processFullAccess = (email: string, doc: Document) => {
+    if (storageService.isEmailBanned(email)) {
+      alert("⚠️ VOTRE IDENTITÉ EST RÉVOQUÉE. CONTACTEZ L'ADMINISTRATION POLARIS.");
+      return;
+    }
+    storageService.logDownload(email, doc.title, doc.id);
+    storageService.incrementDownload(doc.id);
+    storageService.sendToCloudLog(email, doc.title, 'Acquisition Nexus');
+    
+    const newXP = storageService.addXP(25);
+    setUserXP(newXP);
+    setViewerDoc(doc);
+  };
+
+  const handleIdentityConfirm = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pendingDoc && userEmail.includes('@')) {
+      storageService.saveUserEmail(userEmail);
+      processFullAccess(userEmail, pendingDoc);
+      setShowEmailModal(false);
+    }
+  };
 
   const navigateTo = (cat: Category | null) => {
     setViewMode('archives');
@@ -107,56 +140,20 @@ const App: React.FC = () => {
         d.description.toLowerCase().includes(q)
       );
     }
-
     if (viewMode === 'library') {
       const historyIds = storageService.getUserHistory();
       return documents.filter(doc => historyIds.includes(doc.id));
     }
-
     if (navigationPath.length === 0) return [];
     const lastCatId = navigationPath[navigationPath.length - 1].id;
     return documents.filter(doc => doc.categoryId === lastCatId);
   }, [documents, navigationPath, searchQuery, viewMode]);
 
-  const initiateDownload = (doc: Document) => {
-    if (!doc.fileUrl) return;
-    setPendingDoc(doc);
-    const savedEmail = storageService.getUserEmail();
-    if (!savedEmail) setShowEmailModal(true);
-    else processDownload(savedEmail, doc);
-  };
-
-  const processDownload = (email: string, doc: Document) => {
-    if (storageService.isEmailBanned(email)) {
-      alert("⚠️ ACCÈS RÉVOQUÉ PAR LA MATRICE");
-      return;
-    }
-    storageService.logDownload(email, doc.title, doc.id);
-    storageService.incrementDownload(doc.id);
-    storageService.sendToCloudLog(email, doc.title, 'Téléchargement');
-    
-    const newXP = storageService.addXP(10);
-    setUserXP(newXP);
-    setViewerDoc(doc);
-  };
-
-  const handleIdentityConfirm = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (pendingDoc && userEmail.includes('@')) {
-      storageService.saveUserEmail(userEmail);
-      processDownload(userEmail, pendingDoc);
-      setShowEmailModal(false);
-    }
-  };
-
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
     const accounts = storageService.getAccounts();
     const user = accounts.find(a => a.username.toLowerCase() === adminUsername.toLowerCase());
-    
-    let isAuthorized = false;
-    if (adminUsername.toLowerCase() === 'astarté' && adminPassword === '2008') isAuthorized = true;
-    else if (adminUsername.toLowerCase() === 'léon' && adminPassword === 'mazedxn7') isAuthorized = true;
+    let isAuthorized = (adminUsername.toLowerCase() === 'astarté' && adminPassword === '2008') || (adminUsername.toLowerCase() === 'léon' && adminPassword === 'mazedxn7');
     
     if (isAuthorized && user) {
       setIsAdminMode(true);
@@ -164,6 +161,7 @@ const App: React.FC = () => {
       setShowAdminLogin(false);
       setAdminUsername('');
       setAdminPassword('');
+      storageService.addLog('AUTH', `Terminal débloqué par ${user.username}`);
     } else {
       setLoginError(true);
       setTimeout(() => setLoginError(false), 3000);
@@ -183,7 +181,7 @@ const App: React.FC = () => {
       <header className="container mx-auto px-6 py-12 flex flex-col items-center gap-12 relative z-50">
         <div className="w-full flex flex-col md:flex-row justify-between items-center gap-8 max-w-6xl">
            <div className="flex flex-col items-center gap-6 cursor-pointer group" onClick={() => navigateTo(null)}>
-              <div className="w-16 h-16 bg-slate-900/90 border border-white/10 rounded-[1.5rem] flex items-center justify-center relative shadow-neon group-hover:scale-110 transition-all duration-700">
+              <div className="w-16 h-16 bg-slate-900/90 border border-white/10 rounded-[1.8rem] flex items-center justify-center relative shadow-neon group-hover:scale-110 transition-all duration-700">
                  <i className="fas fa-star text-cyan-400 text-xl group-hover:rotate-[360deg] transition-all duration-1000"></i>
               </div>
               <h1 className="text-2xl font-black tracking-tighter text-white uppercase italic drop-shadow-neon">
@@ -194,12 +192,12 @@ const App: React.FC = () => {
            <div className="flex items-center gap-4">
               <div id="affichage-stats" className="bg-slate-950/60 backdrop-blur-2xl border border-cyan-500/20 p-4 rounded-[2rem] flex items-center gap-5 shadow-2xl border-l-cyan-500/50">
                  <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center border border-cyan-400/20 shadow-neon">
-                    <i className="fas fa-folder-open text-cyan-400 text-sm"></i>
+                    <i className="fas fa-database text-cyan-400 text-sm"></i>
                  </div>
                  <div className="flex flex-col">
-                    <p className="text-[7px] font-black uppercase text-cyan-400/60 tracking-[0.2em]">Base de données</p>
+                    <p className="text-[7px] font-black uppercase text-cyan-400/60 tracking-[0.2em]">Base Nexus</p>
                     <p className="text-[14px] font-black text-white uppercase tracking-tight">
-                       <span id="chiffre-compteur">{totalCount}</span> <span className="text-[9px] text-white/40">Archives</span>
+                       <span>{totalCount}</span> <span className="text-[9px] text-white/40 italic">Archives</span>
                     </p>
                  </div>
               </div>
@@ -264,7 +262,14 @@ const App: React.FC = () => {
               )}
               <div className={`${(searchQuery || viewMode === 'library' || currentLevelCategories.length === 0) ? 'lg:col-span-12' : 'lg:col-span-8'} grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8`}>
                 {displayedDocuments.length > 0 ? (
-                  displayedDocuments.map(doc => <DocumentCard key={doc.id} doc={doc} onDownload={initiateDownload} />)
+                  displayedDocuments.map(doc => (
+                    <DocumentCard 
+                      key={doc.id} 
+                      doc={doc} 
+                      onPreview={handlePreview} 
+                      onDownload={handleObtain} 
+                    />
+                  ))
                 ) : (
                   <div className="col-span-full py-24 text-center">
                      <i className="fas fa-box-open text-white/5 text-5xl mb-6"></i>
@@ -280,17 +285,30 @@ const App: React.FC = () => {
       </main>
 
       <footer className="fixed bottom-0 left-0 w-full py-4 px-12 bg-slate-950/90 backdrop-blur-3xl border-t border-white/5 flex items-center justify-between z-[1000]">
-        <p className="text-[8px] text-white/30 font-black uppercase tracking-[0.4em]">SuccessPolaris — Palais v1.8.0 (Isolated Sync)</p>
+        <p className="text-[8px] text-white/30 font-black uppercase tracking-[0.4em]">SuccessPolaris — Palais v2.0.0 (Identity Focus)</p>
         <button onClick={() => setShowAdminLogin(true)} className="text-[8px] text-white/20 font-black uppercase tracking-widest hover:text-cyan-400 transition-all">DÉVELOPPÉ PAR ASTARTÉ</button>
       </footer>
 
       {showEmailModal && (
         <div className="fixed inset-0 z-[9000] flex items-center justify-center bg-slate-950/98 backdrop-blur-3xl p-6">
-          <div className="max-w-[420px] w-full p-12 bg-slate-900/60 border border-white/15 rounded-[4rem] relative shadow-3xl">
-            <h3 className="text-center text-sm font-black text-white uppercase italic tracking-[0.4em] mb-10">Accès Polaris</h3>
+          <div className="max-w-[440px] w-full p-12 bg-slate-900/60 border border-white/15 rounded-[4rem] relative shadow-3xl text-center">
+            <div className="w-16 h-16 bg-cyan-500/10 rounded-full flex items-center justify-center mx-auto mb-8 border border-cyan-500/30">
+               <i className="fas fa-fingerprint text-cyan-400 text-2xl"></i>
+            </div>
+            <h3 className="text-sm font-black text-white uppercase italic tracking-[0.4em] mb-4">Identification Nexus</h3>
+            <p className="text-[9px] text-white/40 uppercase font-black tracking-widest mb-10 leading-relaxed">
+               Cette action ne sera requise qu'une seule fois.<br/>Rejoignez la Matrice pour débloquer l'accès complet.
+            </p>
             <form onSubmit={handleIdentityConfirm} className="space-y-8">
-              <input type="email" required placeholder="votre@gmail.com" value={userEmail} onChange={e => setUserEmail(e.target.value)} className="w-full bg-black/70 border border-white/10 rounded-[1.8rem] px-8 py-6 text-white text-center font-black outline-none focus:border-cyan-400" />
-              <button type="submit" className="w-full bg-cyan-500 text-slate-950 font-black py-7 rounded-[1.8rem] uppercase text-[11px] tracking-[0.5em] shadow-neon">S'identifier</button>
+              <input 
+                type="email" 
+                required 
+                placeholder="votre@gmail.com" 
+                value={userEmail} 
+                onChange={e => setUserEmail(e.target.value)} 
+                className="w-full bg-black/70 border border-white/10 rounded-[1.8rem] px-8 py-6 text-white text-center font-black outline-none focus:border-cyan-400 transition-all" 
+              />
+              <button type="submit" className="w-full bg-cyan-500 text-slate-950 font-black py-7 rounded-[1.8rem] uppercase text-[11px] tracking-[0.5em] shadow-neon hover:bg-white transition-all">Activer le Profil</button>
             </form>
           </div>
         </div>
@@ -313,7 +331,7 @@ const App: React.FC = () => {
       {isSyncing && (
         <div className="fixed inset-0 z-[20000] flex flex-col items-center justify-center bg-slate-950/98 backdrop-blur-3xl">
            <div className="w-20 h-20 border-2 border-t-cyan-500 rounded-full animate-spin"></div>
-           <p className="text-cyan-400 text-[9px] font-black uppercase tracking-[1.5em] mt-10">Synchronisation Matrice...</p>
+           <p className="text-cyan-400 text-[9px] font-black uppercase tracking-[1.5em] mt-10">Initialisation Nexus...</p>
         </div>
       )}
     </div>
