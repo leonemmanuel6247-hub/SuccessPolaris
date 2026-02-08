@@ -174,7 +174,12 @@ const App: React.FC = () => {
     <div className="min-h-screen text-slate-100 font-['Inter'] relative overflow-x-hidden pb-24">
       <AuroraBackground />
       <ExamCountdown />
-      <PolarisBrain count={totalCount} />
+      
+      <PolarisBrain 
+        count={totalCount} 
+        documents={documents}
+        categories={categories}
+      />
       
       {viewerDoc && <PDFViewer doc={viewerDoc} onClose={() => setViewerDoc(null)} />}
 
@@ -285,7 +290,7 @@ const App: React.FC = () => {
       </main>
 
       <footer className="fixed bottom-0 left-0 w-full py-4 px-12 bg-slate-950/90 backdrop-blur-3xl border-t border-white/5 flex items-center justify-between z-[1000]">
-        <p className="text-[8px] text-white/30 font-black uppercase tracking-[0.4em]">SuccessPolaris — Palais v2.0.0 (Identity Focus)</p>
+        <p className="text-[8px] text-white/30 font-black uppercase tracking-[0.4em]">SuccessPolaris — Palais v2.1.0 (Conscience IA)</p>
         <button onClick={() => setShowAdminLogin(true)} className="text-[8px] text-white/20 font-black uppercase tracking-widest hover:text-cyan-400 transition-all">DÉVELOPPÉ PAR ASTARTÉ</button>
       </footer>
 

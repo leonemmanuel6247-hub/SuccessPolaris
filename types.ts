@@ -28,7 +28,7 @@ export interface Document {
 
 export interface VisitorActivity {
   id: string;
-  type: 'VISIT' | 'DOWNLOAD';
+  type: 'VISIT' | 'DOWNLOAD' | 'PREVIEW';
   email?: string;
   fileName?: string;
   timestamp: string;
@@ -39,6 +39,12 @@ export interface ActivityLog {
   action: 'AUTH' | 'SYSTEM' | 'UPLOAD' | 'DELETE' | 'CONFIG' | 'TRAÇAGE' | 'ACCOUNT' | 'BAN';
   timestamp: string;
   details: string;
+}
+
+export interface ChatMessage {
+  role: 'user' | 'model';
+  text: string;
+  timestamp: string;
 }
 
 export interface UserProfile {
