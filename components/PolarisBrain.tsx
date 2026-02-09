@@ -15,7 +15,7 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [diagInfo, setDiagInfo] = useState<string | null>(null);
-  const [lastStatus, setLastStatus] = useState<'SUCCESS' | 'RELAY' | 'CRITICAL' | null>(null);
+  const [lastSource, setLastSource] = useState<string | null>(null);
   const [lastLatency, setLastLatency] = useState<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -35,18 +35,17 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
     setInputValue('');
     setMessages(prev => [...prev, { role: 'user', text: query, timestamp: new Date().toLocaleTimeString() }]);
     setIsTyping(true);
-    setDiagInfo("OPTIMISATION_DU_FLUX...");
+    setDiagInfo("OPTIMISATION_MULTI_FLUX...");
 
     try {
-      const response: AIProviderResponse = await aiService.processMessage([...messages, { role: 'user', text: query, timestamp: '' }], documents);
-      setLastStatus(response.status);
-      setLastLatency(response.responseTime);
+      const response: AIProviderResponse = await aiService.processMessage(
+        [...messages, { role: 'user', text: query, timestamp: '' }], 
+        documents
+      );
       
-      if (response.status === 'RELAY') {
-        setDiagInfo("POLARIS_MODE_RELAIS");
-      } else if (response.status === 'SUCCESS') {
-        setDiagInfo("POLARIS_ALPHA_OPTIMAL");
-      }
+      setLastSource(response.source);
+      setLastLatency(response.responseTime);
+      setDiagInfo(response.status === 'SUCCESS' ? `POLARIS_VIA_${response.source}` : "POLARIS_RELAIS_ACTIF");
 
       setMessages(prev => [...prev, {
         role: 'model',
@@ -55,7 +54,6 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
       }]);
     } catch (error: any) {
       setDiagInfo("ERREUR_SYSTÈME");
-      setLastStatus('CRITICAL');
       setMessages(prev => [...prev, {
         role: 'model',
         text: "Échec de synchronisation avec le Nexus Polaris. Réessayez.",
@@ -79,7 +77,7 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
           </div>
           <div className="text-left">
              <p className="text-[8px] font-black uppercase text-cyan-400/60 tracking-widest">Polaris Brain</p>
-             <p className="text-[13px] font-black text-white">Astarté Core</p>
+             <p className="text-[13px] font-black text-white">4 IA Parallèles</p>
           </div>
         </button>
       </div>
@@ -94,7 +92,7 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
               <div>
                 <h3 className="text-[11px] font-black text-white uppercase tracking-widest italic">Nexus Polaris</h3>
                 <div className="flex items-center gap-2">
-                   <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${lastStatus === 'RELAY' ? 'bg-orange-500' : 'bg-emerald-500'}`}></div>
+                   <div className="w-1.5 h-1.5 rounded-full animate-pulse bg-emerald-500"></div>
                    <span className="text-[7px] text-white/40 uppercase font-black tracking-tighter">{diagInfo || 'SYSTÈME_ACTIF'}</span>
                 </div>
               </div>
@@ -108,7 +106,8 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
             {messages.length === 0 && (
               <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-30">
                  <i className="fas fa-atom text-4xl text-cyan-400 animate-spin-slow"></i>
-                 <p className="text-[9px] font-black text-white uppercase tracking-[0.3em]">En attente de transmission...</p>
+                 <p className="text-[9px] font-black text-white uppercase tracking-[0.3em]">Course de flux en attente...</p>
+                 <p className="text-[7px] text-cyan-400/40 uppercase">Gemini • Mistral • Zephyr • Llama</p>
               </div>
             )}
             {messages.map((m, i) => (
@@ -117,10 +116,10 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
                   m.role === 'user' ? 'bg-cyan-500 text-black font-bold rounded-tr-none' : 'bg-white/5 border border-white/10 text-white rounded-tl-none'
                 }`}>
                    {m.text}
-                   {m.role === 'model' && i === messages.length - 1 && (
+                   {m.role === 'model' && i === messages.length - 1 && lastSource && (
                      <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between opacity-40">
                         <p className="text-[7px] uppercase font-black italic tracking-widest text-cyan-400">
-                           Polaris Brain
+                           {lastSource} (Gagnante)
                         </p>
                         <p className="text-[7px] text-white/40 font-black">{lastLatency}ms</p>
                      </div>
@@ -132,7 +131,7 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
               <div className="flex items-center gap-3 animate-pulse px-4">
                  <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce"></div>
                  <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce delay-100"></div>
-                 <span className="text-[8px] text-cyan-400/60 uppercase font-black italic">Synchronisation...</span>
+                 <span className="text-[8px] text-cyan-400/60 uppercase font-black italic">Analyse par 4 moteurs...</span>
               </div>
             )}
             <div ref={messagesEndRef} />
@@ -144,10 +143,10 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
                  value={inputValue}
                  onChange={e => setInputValue(e.target.value)}
                  className="flex-1 bg-transparent px-4 py-3 text-[13px] text-white outline-none placeholder-white/20"
-                 placeholder="Message pour Polaris Brain..."
+                 placeholder="Posez votre question au Nexus..."
                />
                <button type="submit" disabled={isTyping} className="w-11 h-11 bg-cyan-500 text-black rounded-xl flex items-center justify-center shadow-neon disabled:opacity-20 hover:bg-cyan-400 transition-colors">
-                  <i className="fas fa-paper-plane text-xs"></i>
+                  <i className="fas fa-bolt text-xs"></i>
                </button>
             </div>
           </form>

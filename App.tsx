@@ -4,8 +4,8 @@ import AuroraBackground from './components/AuroraBackground.tsx';
 import DocumentCard from './components/DocumentCard.tsx';
 import AdminDashboard from './components/AdminDashboard.tsx';
 import PDFViewer from './components/PDFViewer.tsx';
-import PolarisBrain from './components/PolarisBrain.tsx';
 import ExamCountdown from './components/ExamCountdown.tsx';
+import ChatWidget from './components/ChatWidget.tsx';
 import { storageService } from './services/storageService.ts';
 import { Category, Document, AdminAccount } from './types.ts';
 
@@ -115,34 +115,11 @@ const App: React.FC = () => {
     <div className="min-h-screen text-slate-200 selection:bg-cyan-500/30">
       <AuroraBackground />
       <ExamCountdown onAdminAccess={() => setShowAdminLogin(true)} />
-      <PolarisBrain count={totalCount} documents={documents} categories={categories} />
       
-      {/* PORTE DÉROBÉE ASTARTÉ SECONDAIRE */}
-      {!isAdminMode && (
-        <div className="fixed bottom-6 right-[240px] z-[7000] hidden sm:block">
-          <button 
-            onClick={() => setShowAdminLogin(true)}
-            className="flex items-center gap-2 bg-black/40 backdrop-blur-xl border border-cyan-500/20 px-4 py-3 rounded-2xl group hover:border-cyan-400 transition-all"
-          >
-            <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_10px_rgba(0,212,255,1)]"></div>
-            <span className="text-[10px] font-black text-cyan-400/80 uppercase tracking-[0.2em] group-hover:text-cyan-400 transition-colors">
-              ASTARTÉ_ROOT
-            </span>
-          </button>
-        </div>
-      )}
-
+      {/* AI NEXUS WIDGET */}
+      {!isAdminMode && <ChatWidget documents={documents} />}
+      
       {viewerDoc && <PDFViewer doc={viewerDoc} onClose={() => setViewerDoc(null)} />}
-
-      <style>{`
-        @keyframes admin-blink {
-          0%, 100% { opacity: 0.4; }
-          50% { opacity: 1; transform: scale(1.02); filter: drop-shadow(0 0 5px cyan); }
-        }
-        .animate-admin-blink {
-          animation: admin-blink 1s ease-in-out infinite;
-        }
-      `}</style>
 
       <header className="container mx-auto px-6 py-16 flex flex-col items-center gap-12 relative z-50">
         {!isAdminMode && (
@@ -240,14 +217,11 @@ const App: React.FC = () => {
       </main>
 
       <footer className="fixed bottom-0 left-0 w-full py-6 px-12 bg-black/60 backdrop-blur-xl border-t border-white/5 flex items-center justify-between z-[1000]">
-        <p className="text-[8px] text-cyan-400/20 font-black uppercase tracking-[0.5em]">POLARIS PROTOCOL // NEXUS V2.6</p>
+        <p className="text-[8px] text-cyan-400/20 font-black uppercase tracking-[0.5em]">POLARIS PROTOCOL // ASTRALE PALACE</p>
         <div className="flex items-center gap-4">
-           <button 
-             onClick={() => setShowAdminLogin(true)}
-             className="text-[8px] text-white/20 hover:text-cyan-400 transition-colors font-black uppercase tracking-widest italic"
-           >
-             Astarté Léon (Admin Control Room)
-           </button>
+           <span className="text-[8px] text-white/10 font-black uppercase tracking-widest italic">
+             Système Sécurisé
+           </span>
         </div>
       </footer>
 
@@ -271,7 +245,7 @@ const App: React.FC = () => {
             <div className="w-20 h-20 bg-cyan-500/10 border border-cyan-500/20 rounded-3xl flex items-center justify-center mx-auto mb-10">
                <i className="fas fa-key text-cyan-400 text-3xl"></i>
             </div>
-            <h3 className="text-lg font-black text-cyan-400 uppercase italic tracking-widest mb-10">Accès Astarté</h3>
+            <h3 className="text-lg font-black text-cyan-400 uppercase italic tracking-widest mb-10">Authentification Matrice</h3>
             <form onSubmit={(e) => { 
               e.preventDefault(); 
               if(secretCode === 'mazedxn7') {

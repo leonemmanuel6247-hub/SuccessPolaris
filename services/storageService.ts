@@ -15,11 +15,7 @@ const KEYS = {
   USER_HISTORY: 'sp_user_doc_history',
   SHEET_ROW_COUNT: 'sp_document_total_count',
   IA_DIRECTIVES: 'sp_ia_directives',
-  IA_NOTES: 'sp_ia_notes',
-  IA_STATS: 'sp_ia_performance_logs',
-  IA_HEALTH: 'sp_ia_provider_health',
-  QUERY_ANALYSIS: 'sp_query_analysis_logs',
-  IA_ERROR_LOGS: 'sp_ia_critical_errors'
+  IA_NOTES: 'sp_ia_notes'
 };
 
 const parseCSV = (csv: string) => {
@@ -118,71 +114,6 @@ export const storageService = {
     return idMatch ? `https://drive.google.com/file/d/${idMatch[1]}/preview` : url;
   },
 
-  getIADirectives: (): string => localStorage.getItem(KEYS.IA_DIRECTIVES) || "Ton créateur est Astarté Léon. Sois poli, futuriste et motivant.",
-  saveIADirectives: (text: string) => localStorage.setItem(KEYS.IA_DIRECTIVES, text),
-  
-  getIANotes: (): string => localStorage.getItem(KEYS.IA_NOTES) || "",
-  saveIANotes: (text: string) => localStorage.setItem(KEYS.IA_NOTES, text),
-
-  logQueryForAnalysis: (email: string | null, query: string, response: string) => {
-    const analysis = JSON.parse(localStorage.getItem(KEYS.QUERY_ANALYSIS) || '[]');
-    analysis.push({
-      id: Date.now(),
-      email: email || 'Anonyme',
-      query,
-      responseSummary: response.substring(0, 100) + '...',
-      timestamp: new Date().toLocaleString()
-    });
-    localStorage.setItem(KEYS.QUERY_ANALYSIS, JSON.stringify(analysis.slice(-200)));
-  },
-
-  getQueryAnalysis: () => JSON.parse(localStorage.getItem(KEYS.QUERY_ANALYSIS) || '[]'),
-
-  logAIResponse: (modelName: string, timeTaken: number) => {
-    const stats = JSON.parse(localStorage.getItem(KEYS.IA_STATS) || '[]');
-    stats.push({ model: modelName, time: timeTaken, timestamp: Date.now() });
-    localStorage.setItem(KEYS.IA_STATS, JSON.stringify(stats.slice(-500)));
-    
-    const health = JSON.parse(localStorage.getItem(KEYS.IA_HEALTH) || '{}');
-    health[modelName] = { status: 'online', lastUpdate: Date.now(), error: null };
-    localStorage.setItem(KEYS.IA_HEALTH, JSON.stringify(health));
-  },
-
-  logAIError: (modelName: string, errorMsg: string) => {
-    const health = JSON.parse(localStorage.getItem(KEYS.IA_HEALTH) || '{}');
-    health[modelName] = { status: 'offline', lastUpdate: Date.now(), error: errorMsg };
-    localStorage.setItem(KEYS.IA_HEALTH, JSON.stringify(health));
-    
-    const errors = JSON.parse(localStorage.getItem(KEYS.IA_ERROR_LOGS) || '[]');
-    errors.push({ id: Date.now(), model: modelName, error: errorMsg, timestamp: new Date().toLocaleString() });
-    localStorage.setItem(KEYS.IA_ERROR_LOGS, JSON.stringify(errors.slice(-50)));
-    
-    storageService.addLog('SYSTEM', `Échec Nexus ${modelName}: ${errorMsg.substring(0, 50)}`);
-  },
-
-  getAIHealth: () => JSON.parse(localStorage.getItem(KEYS.IA_HEALTH) || '{}'),
-  getAICriticalErrors: () => JSON.parse(localStorage.getItem(KEYS.IA_ERROR_LOGS) || '[]'),
-
-  getAIStats: () => {
-    const logs = JSON.parse(localStorage.getItem(KEYS.IA_STATS) || '[]');
-    const summary: Record<string, { count: number, totalTime: number }> = {};
-    logs.forEach((log: any) => {
-      if (!summary[log.model]) summary[log.model] = { count: 0, totalTime: 0 };
-      summary[log.model].count++;
-      summary[log.model].totalTime += log.time;
-    });
-    const health = storageService.getAIHealth();
-    return Object.entries(summary)
-      .map(([name, data]) => ({
-        name,
-        count: data.count,
-        avgTime: Math.round(data.totalTime / data.count),
-        status: health[name]?.status || 'unknown',
-        lastError: health[name]?.error || null
-      }))
-      .sort((a, b) => b.count - a.count);
-  },
-
   getUserXP: (): number => parseInt(localStorage.getItem(KEYS.USER_XP) || '0'),
   addXP: (amount: number): number => {
     const newXP = storageService.getUserXP() + amount;
@@ -247,6 +178,11 @@ export const storageService = {
   addLog: (action: any, details: string) => {
     const logs = JSON.parse(localStorage.getItem(KEYS.LOGS) || '[]');
     localStorage.setItem(KEYS.LOGS, JSON.stringify([{ id: Date.now().toString(), action, details, timestamp: new Date().toLocaleString() }, ...logs].slice(0, 100)));
+  },
+  getIADirectives: (): string => localStorage.getItem(KEYS.IA_DIRECTIVES) || 'Vous êtes Polaris Brain, un assistant ultra-rapide.',
+  getIANotes: (): string => localStorage.getItem(KEYS.IA_NOTES) || 'Focus BAC 2025.',
+  logAIResponse: (provider: string, latency: number): void => {
+    storageService.addLog('SYSTEM', `IA [${provider}] répondue en ${latency}ms`);
   },
   logVisit: (): void => {
     const activities = JSON.parse(localStorage.getItem(KEYS.VISITOR_ACTIVITY) || '[]');

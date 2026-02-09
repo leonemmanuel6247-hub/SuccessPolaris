@@ -41,14 +41,15 @@ export interface ActivityLog {
   details: string;
 }
 
-export interface ChatMessage {
-  role: 'user' | 'model';
-  text: string;
-  timestamp: string;
-}
-
 export interface UserProfile {
   xp: number;
   email: string;
   level: string;
+}
+
+// Fixed missing ChatMessage interface to resolve import errors
+export interface ChatMessage {
+  role: 'user' | 'model';
+  text: string;
+  timestamp: string;
 }
