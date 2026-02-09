@@ -52,11 +52,14 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
         timestamp: new Date().toLocaleTimeString()
       }]);
     } catch (error: any) {
-      const technicalError = error.message || "UNKNOWN_SYNC_ERROR";
-      setDiagInfo(`PROTOCOLE_INTERROMPU : ${technicalError}`);
+      const isMissingKey = error.message?.includes('CLÉ_ABSENTE');
+      setDiagInfo(isMissingKey ? "PROTOCOLE_GAMMA_ACTIF" : "ERREUR_FLUX_NEXUS");
+      
       setMessages(prev => [...prev, {
         role: 'model',
-        text: "Désolé, le Nexus rencontre une instabilité majeure hors de son périmètre d'origine. Veuillez vérifier la configuration de vos clés API dans le dashboard de l'hébergeur.",
+        text: isMissingKey 
+          ? "Système en mode autonome. Je reste à votre disposition, mais certaines de mes capacités avancées sont en veille. Comment puis-je vous aider pour vos révisions ?" 
+          : "Une fluctuation dans le Nexus astral empêche ma réponse. Réessayez dans un instant.",
         timestamp: new Date().toLocaleTimeString()
       }]);
     } finally {
@@ -77,7 +80,7 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
           </div>
           <div className="text-left">
              <p className="text-[8px] font-black uppercase text-cyan-400/60 tracking-widest">IA Polaris</p>
-             <p className="text-[13px] font-black text-white">Brain v3.1</p>
+             <p className="text-[13px] font-black text-white">Brain v3.2</p>
           </div>
         </button>
       </div>
@@ -92,8 +95,8 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
               <div>
                 <h3 className="text-[12px] font-black text-white uppercase tracking-widest italic">Polaris Brain</h3>
                 <div className="flex items-center gap-2">
-                   <div className={`w-1.5 h-1.5 rounded-full ${diagInfo ? 'bg-red-500' : 'bg-emerald-500'} animate-pulse`}></div>
-                   <span className="text-[7px] text-white/30 uppercase font-black truncate max-w-[150px]">{diagInfo || 'Liaison Stable'}</span>
+                   <div className={`w-1.5 h-1.5 rounded-full ${diagInfo ? 'bg-orange-500' : 'bg-emerald-500'} animate-pulse`}></div>
+                   <span className="text-[7px] text-white/30 uppercase font-black">{diagInfo || 'Nexus Connecté'}</span>
                 </div>
               </div>
             </div>
@@ -106,42 +109,41 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
             {messages.length === 0 && (
               <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-30">
                  <i className="fas fa-atom text-4xl text-cyan-400 animate-spin-slow"></i>
-                 <p className="text-[9px] font-black text-white uppercase tracking-[0.3em]">Synchro du Nexus en cours...</p>
+                 <p className="text-[9px] font-black text-white uppercase tracking-[0.3em]">Synchro Astrale...</p>
               </div>
             )}
             {messages.map((m, i) => (
               <div key={i} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
-                <div className={`max-w-[85%] p-5 rounded-[1.8rem] text-[12.5px] leading-relaxed ${
-                  m.role === 'user' ? 'bg-cyan-500 text-black font-bold rounded-tr-none' : 'bg-white/5 border border-white/10 text-white rounded-tl-none shadow-xl'
+                <div className={`max-w-[85%] p-5 rounded-[1.8rem] text-[12.5px] leading-relaxed shadow-lg ${
+                  m.role === 'user' ? 'bg-cyan-500 text-black font-bold rounded-tr-none' : 'bg-white/5 border border-white/10 text-white rounded-tl-none'
                 }`}>
                    {m.text}
                    {m.role === 'model' && i === messages.length - 1 && activeSource && (
                      <p className="mt-4 pt-4 border-t border-white/5 text-[7px] text-cyan-400/40 uppercase font-black italic tracking-widest">{activeSource}</p>
                    )}
                 </div>
-                <span className="text-[7px] text-white/20 font-black mt-2 px-4 uppercase tracking-widest">{m.timestamp}</span>
               </div>
             ))}
             {isTyping && (
               <div className="flex items-center gap-3 animate-pulse px-4">
                  <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce"></div>
                  <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce delay-100"></div>
-                 <span className="text-[8px] text-cyan-400/60 uppercase font-black tracking-widest italic">Analyse du Flux...</span>
+                 <span className="text-[8px] text-cyan-400/60 uppercase font-black">Analyse...</span>
               </div>
             )}
             <div ref={messagesEndRef} />
           </div>
 
-          <form onSubmit={handleSendMessage} className="p-6 bg-black/40 border-t border-white/5 backdrop-blur-xl">
-            <div className="flex items-center bg-white/5 border border-white/10 rounded-2xl p-2 focus-within:border-cyan-500/50 transition-all shadow-inner">
+          <form onSubmit={handleSendMessage} className="p-6 bg-black/40 border-t border-white/5">
+            <div className="flex items-center bg-white/5 border border-white/10 rounded-2xl p-2 focus-within:border-cyan-500/50 transition-all">
                <input 
                  value={inputValue}
                  onChange={e => setInputValue(e.target.value)}
-                 className="flex-1 bg-transparent px-4 py-3 text-[13px] text-white outline-none placeholder-white/10 font-medium"
-                 placeholder="Interroger Polaris Brain..."
+                 className="flex-1 bg-transparent px-4 py-3 text-[13px] text-white outline-none placeholder-white/10"
+                 placeholder="Message pour Polaris..."
                />
-               <button type="submit" disabled={!inputValue.trim() || isTyping} className="w-11 h-11 bg-cyan-500 text-black rounded-xl flex items-center justify-center shadow-neon hover:scale-105 active:scale-90 transition-all disabled:opacity-20">
-                  <i className="fas fa-bolt-lightning text-xs"></i>
+               <button type="submit" disabled={isTyping} className="w-11 h-11 bg-cyan-500 text-black rounded-xl flex items-center justify-center shadow-neon disabled:opacity-20">
+                  <i className="fas fa-paper-plane text-xs"></i>
                </button>
             </div>
           </form>

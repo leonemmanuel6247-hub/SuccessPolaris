@@ -8,107 +8,93 @@ export interface AIProviderResponse {
   source: string;
 }
 
-// Canal de secours (OpenRouter / StepFun) pour garantir la continuité de service
-const GAMMA_BACKUP_KEY = "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";
-
+// Service d'intelligence artificielle Polaris utilisant le SDK officiel @google/genai
 export const aiService = {
+  /**
+   * Construit le prompt système pour Polaris Brain en intégrant les documents et les directives de l'administrateur.
+   */
   getSystemPrompt: (documents: Document[]) => {
     const docsContext = documents.length > 0 
       ? documents.map(d => `- ${d.title} (ID: ${d.id})`).join('\n')
-      : "Aucun document n'est chargé.";
+      : "Aucune archive PDF détectée.";
     
     const directives = storageService.getIADirectives();
     const notes = storageService.getIANotes();
     
-    return `TU ES POLARIS BRAIN, L'ASSISTANT DE SUCCESSPOLARIS.
-TON STYLE : Futuriste, Poli, Très Motivant.
-DIRECTIVES : ${directives}
-NOTES : ${notes}
-ARCHIVES DISPONIBLES :
+    return `TU ES POLARIS BRAIN, L'ENTITÉ D'ASSISTANCE DE SUCCESSPOLARIS.
+STYLE : Futuriste, Poli, Très Motivant. Spécialiste BAC 2025.
+DIRECTIVES ADMIN : ${directives}
+NOTES DE COURS : ${notes}
+
+ARCHIVES PDF DISPONIBLES :
 ${docsContext}
 
 PROTOCOLE :
 1. Aide l'élève pour le BAC 2025.
-2. Suggère TOUJOURS de consulter les PDF si pertinent.
-3. Ne dis jamais que tu es une IA limitée.`;
+2. Suggère TOUJOURS les PDF si pertinent.
+3. Ne mentionne pas tes limites techniques.`;
   },
 
-  fetchAlpha: async (messages: ChatMessage[], prompt: string): Promise<AIProviderResponse> => {
-    const modelName = 'Nexus Alpha (Gemini)';
-    const apiKey = process.env.API_KEY;
-    
-    if (!apiKey || apiKey === "undefined") {
-      throw new Error("KEY_NOT_SET: La variable API_KEY n'est pas configurée chez l'hébergeur.");
-    }
-
-    try {
-      const start = Date.now();
-      const ai = new GoogleGenAI({ apiKey });
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: messages.slice(-5).map(m => ({ role: m.role, parts: [{ text: m.text }] })),
-        config: { systemInstruction: prompt, temperature: 0.7 }
-      });
-      
-      const text = response.text || "";
-      if (!text) throw new Error("EMPTY_RESPONSE");
-      
-      storageService.logAIResponse(modelName, Date.now() - start);
-      return { text, source: modelName };
-    } catch (e: any) {
-      storageService.logAIError(modelName, e.message);
-      throw e;
-    }
-  },
-
-  fetchGamma: async (messages: ChatMessage[], prompt: string): Promise<AIProviderResponse> => {
-    const modelName = 'Nexus Gamma (Backup)';
-    try {
-      const start = Date.now();
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: { 
-          "Authorization": `Bearer ${GAMMA_BACKUP_KEY}`, 
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: "stepfun/step-1-flash",
-          messages: [
-            { role: "system", content: prompt },
-            ...messages.slice(-5).map(m => ({ role: m.role === 'model' ? 'assistant' : 'user', content: m.text }))
-          ]
-        })
-      });
-      
-      if (!response.ok) throw new Error(`GAMMA_HTTP_${response.status}`);
-      const data = await response.json();
-      const text = data.choices?.[0]?.message?.content || "";
-      
-      storageService.logAIResponse(modelName, Date.now() - start);
-      return { text, source: modelName };
-    } catch (e: any) { 
-      storageService.logAIError(modelName, e.message);
-      throw e; 
-    }
-  },
-
+  /**
+   * Traite le message de l'utilisateur avec le modèle Gemini.
+   * Utilise gemini-3-flash-preview pour une réponse rapide et efficace.
+   * Cette implémentation corrige l'erreur Promise.any en utilisant le SDK officiel.
+   */
   processMessage: async (messages: ChatMessage[], documents: Document[]): Promise<AIProviderResponse> => {
-    const prompt = aiService.getSystemPrompt(documents);
-    const lastQuery = messages[messages.length - 1]?.text || "";
-    
+    // Initialisation du client avec la clé d'API de l'environnement (process.env.API_KEY)
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const systemInstruction = aiService.getSystemPrompt(documents);
+    const start = Date.now();
+    const modelName = 'gemini-3-flash-preview';
+
     try {
-      // Stratégie : Essayer Alpha, basculer sur Gamma en cas d'erreur de clé ou réseau
-      const result = await aiService.fetchAlpha(messages, prompt)
-        .catch((err) => {
-          console.warn("Nexus Alpha indisponible, basculement Gamma...", err.message);
-          return aiService.fetchGamma(messages, prompt);
-        });
+      // Transformation de l'historique des messages pour le format supporté par le SDK Google GenAI
+      const contents = messages.map(m => ({
+        role: m.role,
+        parts: [{ text: m.text }]
+      }));
+
+      // Appel de l'API avec la configuration optimisée
+      const response = await ai.models.generateContent({
+        model: modelName,
+        contents: contents,
+        config: {
+          systemInstruction: systemInstruction,
+          temperature: 0.8,
+          maxOutputTokens: 1000,
+        },
+      });
+
+      const text = response.text;
+      if (!text) {
+        throw new Error("Le Nexus a retourné un signal vide.");
+      }
+
+      const timeTaken = Date.now() - start;
       
-      storageService.logQueryForAnalysis(storageService.getUserEmail(), lastQuery, result.text);
-      return result;
+      // Enregistrement des statistiques de performance pour le monitoring admin
+      storageService.logAIResponse(modelName, timeTaken);
+      
+      // Analyse et archivage du flux de conversation pour le dashboard
+      storageService.logQueryForAnalysis(
+        storageService.getUserEmail(),
+        messages[messages.length - 1]?.text || "Requête inconnue",
+        text
+      );
+
+      return { 
+        text, 
+        source: `Nexus ${modelName}` 
+      };
     } catch (e: any) {
-      console.error("Blackout Total Nexus:", e.message);
-      throw new Error(e.message || "TOTAL_BLACKOUT");
+      // Journalisation critique en cas d'échec du service
+      storageService.logAIError(modelName, e.message);
+      console.error("Gemini AI Critical Error:", e);
+      
+      return {
+        text: "Une fluctuation dans le Nexus astral empêche ma réponse. Réessayez dans un instant.",
+        source: "LOG_SYSTEM_FAILURE"
+      };
     }
   }
 };
