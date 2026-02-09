@@ -29,43 +29,55 @@ TON IDENTITÉ ET MÉMOIRE : ${customMemory}
 TON OBJECTIF : Expliquer les cours et aider pour le BAC 2025.
 
 CONSIGNES DE STYLE :
-1. Langage Simple : Explique les concepts comme si tu parlais à un enfant de 10 ans, mais avec la précision attendue par un lycéen.
-2. Pas de Jargon : N'utilise plus de mots comme "Matrice", "Stellar", "Constellation", "Nexus". Sois humain et pro.
-3. Formatage : Utilise abondamment le **gras** pour les mots clés, l'*italique* pour les définitions, et des listes à puces.
-4. Couleurs et Soulignement : Tu peux utiliser des balises HTML simples comme <u>souligné</u> ou <span style="color:#00d4ff">texte en couleur</span> si nécessaire.
-5. Documents : Suggère toujours de consulter les PDF de SuccessPolaris listés ici :
+1. Langage Simple : Explique les concepts comme si tu parlais à un enfant de 10 ans.
+2. Pas de Jargon : Sois humain et pro.
+3. Formatage : Utilise le **gras** et des listes.
+4. Documents : Suggère toujours de consulter les PDF de SuccessPolaris listés ici :
 ${docsContext}
 
 Rappelle-toi : Ton unique but est le succès de l'élève.`;
   },
 
   fetchGeminiAlpha: async (messages: ChatMessage[], prompt: string): Promise<AIProviderResponse> => {
-    const start = Date.now();
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: messages.slice(-5).map(m => ({ role: m.role, parts: [{ text: m.text }] })),
-      config: { systemInstruction: prompt, temperature: 0.6 }
-    });
-    const time = Date.now() - start;
-    storageService.logAIResponse('Gemini 3 Flash', time);
-    return { text: response.text || "", source: "Polaris Brain" };
+    const modelName = 'Gemini 3 Flash';
+    try {
+      const start = Date.now();
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: messages.slice(-5).map(m => ({ role: m.role, parts: [{ text: m.text }] })),
+        config: { systemInstruction: prompt, temperature: 0.6 }
+      });
+      const time = Date.now() - start;
+      storageService.logAIResponse(modelName, time);
+      return { text: response.text || "", source: modelName };
+    } catch (e) {
+      storageService.logAIError(modelName);
+      throw e;
+    }
   },
 
   fetchGeminiBeta: async (messages: ChatMessage[], prompt: string): Promise<AIProviderResponse> => {
-    const start = Date.now();
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const response = await ai.models.generateContent({
-      model: 'gemini-flash-lite-latest',
-      contents: messages.slice(-5).map(m => ({ role: m.role, parts: [{ text: m.text }] })),
-      config: { systemInstruction: prompt, temperature: 0.6 }
-    });
-    const time = Date.now() - start;
-    storageService.logAIResponse('Gemini Lite', time);
-    return { text: response.text || "", source: "Polaris Brain" };
+    const modelName = 'Gemini Lite';
+    try {
+      const start = Date.now();
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const response = await ai.models.generateContent({
+        model: 'gemini-flash-lite-latest',
+        contents: messages.slice(-5).map(m => ({ role: m.role, parts: [{ text: m.text }] })),
+        config: { systemInstruction: prompt, temperature: 0.6 }
+      });
+      const time = Date.now() - start;
+      storageService.logAIResponse(modelName, time);
+      return { text: response.text || "", source: modelName };
+    } catch (e) {
+      storageService.logAIError(modelName);
+      throw e;
+    }
   },
 
   fetchStepFun: async (messages: ChatMessage[], prompt: string): Promise<AIProviderResponse> => {
+    const modelName = 'StepFun Flash';
     try {
       const start = Date.now();
       const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -76,14 +88,19 @@ Rappelle-toi : Ton unique but est le succès de l'élève.`;
           messages: [{ role: "system", content: prompt }, ...messages.slice(-5).map(m => ({ role: m.role === 'model' ? 'assistant' : 'user', content: m.text }))]
         })
       });
+      if (!response.ok) throw new Error();
       const data = await response.json();
       const time = Date.now() - start;
-      storageService.logAIResponse('StepFun Flash', time);
-      return { text: data.choices?.[0]?.message?.content || "", source: "Polaris Brain" };
-    } catch { throw new Error(); }
+      storageService.logAIResponse(modelName, time);
+      return { text: data.choices?.[0]?.message?.content || "", source: modelName };
+    } catch { 
+      storageService.logAIError(modelName);
+      throw new Error(); 
+    }
   },
 
   fetchDeepSeek: async (messages: ChatMessage[], prompt: string): Promise<AIProviderResponse> => {
+    const modelName = 'DeepSeek R1';
     try {
       const start = Date.now();
       const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -94,39 +111,29 @@ Rappelle-toi : Ton unique but est le succès de l'élève.`;
           messages: [{ role: "system", content: prompt }, ...messages.slice(-5).map(m => ({ role: m.role === 'model' ? 'assistant' : 'user', content: m.text }))]
         })
       });
+      if (!response.ok) throw new Error();
       const data = await response.json();
       const time = Date.now() - start;
-      storageService.logAIResponse('DeepSeek R1', time);
-      return { text: data.choices?.[0]?.message?.content || "", source: "Polaris Brain" };
-    } catch { throw new Error(); }
-  },
-
-  fetchSolar: async (messages: ChatMessage[], prompt: string): Promise<AIProviderResponse> => {
-    try {
-      const start = Date.now();
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${SOLAR_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "upstage/solar-pro-3:free",
-          messages: [{ role: "system", content: prompt }, ...messages.slice(-5).map(m => ({ role: m.role === 'model' ? 'assistant' : 'user', content: m.text }))]
-        })
-      });
-      const data = await response.json();
-      const time = Date.now() - start;
-      storageService.logAIResponse('Solar Pro', time);
-      return { text: data.choices?.[0]?.message?.content || "", source: "Polaris Brain" };
-    } catch { throw new Error(); }
+      storageService.logAIResponse(modelName, time);
+      return { text: data.choices?.[0]?.message?.content || "", source: modelName };
+    } catch { 
+      storageService.logAIError(modelName);
+      throw new Error(); 
+    }
   },
 
   processMessage: async (messages: ChatMessage[], documents: Document[]): Promise<AIProviderResponse> => {
     const prompt = aiService.getSystemPrompt(documents);
-    return (Promise as any).any([
-      aiService.fetchGeminiAlpha(messages, prompt),
-      aiService.fetchGeminiBeta(messages, prompt),
-      aiService.fetchStepFun(messages, prompt),
-      aiService.fetchDeepSeek(messages, prompt),
-      aiService.fetchSolar(messages, prompt)
-    ]);
+    try {
+      return await (Promise as any).any([
+        aiService.fetchGeminiAlpha(messages, prompt),
+        aiService.fetchGeminiBeta(messages, prompt),
+        aiService.fetchStepFun(messages, prompt),
+        aiService.fetchDeepSeek(messages, prompt)
+      ]);
+    } catch (aggregateError) {
+      storageService.addLog('SYSTEM', "Échec total de tous les fournisseurs d'IA (Blackout)");
+      throw new Error("BLACKOUT_IA");
+    }
   }
 };

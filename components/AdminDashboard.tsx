@@ -145,23 +145,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
           <div className="space-y-12 animate-in">
              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="bg-slate-900/40 p-8 rounded-[2rem] border border-white/10">
-                   <h4 className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mb-6 italic">Performance des Modèles</h4>
+                   <h4 className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mb-6 italic">État de Santé du Nexus</h4>
                    <div className="space-y-4">
                       {aiStats.map((stat, idx) => {
                         const isFastest = fastestAI?.name === stat.name;
+                        const isOffline = stat.status === 'offline';
                         return (
-                          <div key={stat.name} className={`flex items-center justify-between p-4 bg-white/5 rounded-xl border transition-all ${isFastest ? 'border-cyan-400 shadow-[0_0_15px_rgba(0,212,255,0.2)]' : 'border-white/5'}`}>
+                          <div key={stat.name} className={`flex items-center justify-between p-4 bg-white/5 rounded-xl border transition-all ${isFastest ? 'border-cyan-400 shadow-[0_0_15px_rgba(0,212,255,0.2)]' : 'border-white/5'} ${isOffline ? 'opacity-50 border-red-500/50' : ''}`}>
                              <div className="flex items-center gap-3">
+                                <div className={`w-2 h-2 rounded-full ${isOffline ? 'bg-red-500 animate-pulse' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'}`}></div>
                                 <div>
                                    <p className="text-white font-black text-[12px] uppercase flex items-center gap-2">
                                       {stat.name}
-                                      {isFastest && <span className="text-[7px] bg-cyan-500 text-black px-2 py-0.5 rounded-full font-black animate-pulse">ALPHA_SPEED</span>}
+                                      {isFastest && <span className="text-[7px] bg-cyan-500 text-black px-2 py-0.5 rounded-full font-black">ALPHA_SPEED</span>}
                                    </p>
-                                   <p className="text-[8px] text-white/30 uppercase font-black">{stat.count} RÉPONSES GÉNÉRÉES</p>
+                                   <p className="text-[8px] text-white/30 uppercase font-black">{isOffline ? 'FLUX INTERROMPU' : `${stat.count} RÉPONSES GÉNÉRÉES`}</p>
                                 </div>
                              </div>
                              <div className="text-right">
-                                <p className={`font-mono font-bold ${isFastest ? 'text-cyan-400 text-lg' : 'text-white/60'}`}>{stat.avgTime}ms</p>
+                                <p className={`font-mono font-bold ${isFastest ? 'text-cyan-400 text-lg' : 'text-white/60'}`}>{isOffline ? '---' : `${stat.avgTime}ms`}</p>
                                 <p className="text-[7px] text-white/20 uppercase font-black tracking-widest">LATENCE MOYENNE</p>
                              </div>
                           </div>

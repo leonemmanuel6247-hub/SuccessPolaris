@@ -14,6 +14,7 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [lastError, setLastError] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -34,24 +35,27 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
     return <div dangerouslySetInnerHTML={{ __html: formatted }} />;
   };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputValue.trim() || isTyping) return;
+  const handleSendMessage = async (e?: React.FormEvent, retryText?: string) => {
+    if (e) e.preventDefault();
+    const textToSend = retryText || inputValue;
+    if (!textToSend.trim() || isTyping) return;
 
-    const userMsgText = inputValue;
-    const userMessage: ChatMessage = {
-      role: 'user',
-      text: userMsgText,
-      timestamp: new Date().toLocaleTimeString()
-    };
-
-    const updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages);
-    setInputValue('');
+    setLastError(false);
+    if (!retryText) {
+      const userMessage: ChatMessage = {
+        role: 'user',
+        text: textToSend,
+        timestamp: new Date().toLocaleTimeString()
+      };
+      setMessages(prev => [...prev, userMessage]);
+      setInputValue('');
+    }
+    
     setIsTyping(true);
 
     try {
-      const response: AIProviderResponse = await aiService.processMessage(updatedMessages, documents);
+      const currentMessages = retryText ? messages : [...messages, { role: 'user', text: textToSend, timestamp: '' } as ChatMessage];
+      const response: AIProviderResponse = await aiService.processMessage(currentMessages, documents);
       
       if (response.text) {
         setMessages(prev => [...prev, {
@@ -61,9 +65,10 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
         }]);
       }
     } catch (error) {
+      setLastError(true);
       setMessages(prev => [...prev, {
         role: 'model',
-        text: "Désolé, j'ai eu un petit problème technique. Peux-tu reformuler ta question ?",
+        text: "Désolé, une instabilité temporaire dans le Nexus m'empêche de répondre. Veux-tu réessayer ?",
         timestamp: new Date().toLocaleTimeString()
       }]);
     } finally {
@@ -98,7 +103,7 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
               </div>
               <div>
                 <h3 className="text-white font-black uppercase text-[12px] tracking-widest">Polaris Brain</h3>
-                <p className="text-[7px] text-white/30 font-black uppercase tracking-[0.3em]">Créé par Astarté Léon</p>
+                <p className="text-[7px] text-white/30 font-black uppercase tracking-[0.3em]">IA Core Alpha</p>
               </div>
             </div>
             <button onClick={() => setIsOpen(false)} className="text-white/20 hover:text-white transition-colors p-2">
@@ -109,8 +114,8 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
           <div className="flex-1 overflow-y-auto p-6 space-y-6 scroll-smooth custom-scrollbar">
             {messages.length === 0 && (
               <div className="h-full flex flex-col items-center justify-center text-center space-y-4 px-4">
-                <p className="text-[11px] text-white/50 font-medium leading-relaxed">
-                  Bonjour ! Je suis ton assistant **Polaris Brain**.<br/>Comment puis-je t'aider dans tes révisions aujourd'hui ?
+                <p className="text-[11px] text-white/50 font-medium leading-relaxed uppercase tracking-wider">
+                  Bonjour ! Je suis ton assistant **Polaris Brain**.<br/>Mes senseurs sont actifs. Comment puis-je t'aider ?
                 </p>
               </div>
             )}
@@ -123,6 +128,14 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
                   : 'bg-white/5 border border-white/10 text-white/90 rounded-tl-none'
                 }`}>
                   {renderFormattedText(msg.text)}
+                  {idx === messages.length - 1 && lastError && msg.role === 'model' && (
+                    <button 
+                      onClick={() => handleSendMessage(undefined, messages[messages.length-2]?.text)}
+                      className="mt-3 block w-full py-2 bg-cyan-400/10 border border-cyan-400/30 rounded-xl text-cyan-400 text-[9px] font-black uppercase tracking-widest hover:bg-cyan-400/20 transition-all"
+                    >
+                      <i className="fas fa-redo mr-2"></i> Relancer le Flux
+                    </button>
+                  )}
                 </div>
                 <span className="text-[7px] text-white/20 font-bold mt-1 px-2">{msg.timestamp}</span>
               </div>
@@ -135,7 +148,7 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
                   <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{animationDelay:'150ms'}}></div>
                   <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{animationDelay:'300ms'}}></div>
                 </div>
-                <span className="text-[7px] text-white/20 uppercase font-black tracking-widest italic">Polaris réfléchit...</span>
+                <span className="text-[7px] text-white/20 uppercase font-black tracking-widest italic">Synchronisation...</span>
               </div>
             )}
             <div ref={messagesEndRef} />

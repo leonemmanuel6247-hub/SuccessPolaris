@@ -15,7 +15,8 @@ const KEYS = {
   USER_HISTORY: 'sp_user_doc_history',
   SHEET_ROW_COUNT: 'sp_document_total_count',
   IA_MEMORY: 'sp_ia_core_memory',
-  IA_STATS: 'sp_ia_performance_logs'
+  IA_STATS: 'sp_ia_performance_logs',
+  IA_HEALTH: 'sp_ia_provider_health'
 };
 
 const parseCSV = (csv: string) => {
@@ -114,17 +115,29 @@ export const storageService = {
     return idMatch ? `https://drive.google.com/file/d/${idMatch[1]}/preview` : url;
   },
 
-  // IA MEMORY MANAGEMENT
   getIAMemory: (): string => localStorage.getItem(KEYS.IA_MEMORY) || "Ton créateur est Astarté Léon. Tu es Polaris Brain.",
   saveIAMemory: (memory: string) => localStorage.setItem(KEYS.IA_MEMORY, memory),
 
-  // IA PERFORMANCE STATS
   logAIResponse: (modelName: string, timeTaken: number) => {
     const stats = JSON.parse(localStorage.getItem(KEYS.IA_STATS) || '[]');
     stats.push({ model: modelName, time: timeTaken, timestamp: Date.now() });
-    // Garder seulement les 500 derniers logs pour la performance
     localStorage.setItem(KEYS.IA_STATS, JSON.stringify(stats.slice(-500)));
+    
+    // Marquer comme opérationnel
+    const health = JSON.parse(localStorage.getItem(KEYS.IA_HEALTH) || '{}');
+    health[modelName] = { status: 'online', lastUpdate: Date.now() };
+    localStorage.setItem(KEYS.IA_HEALTH, JSON.stringify(health));
   },
+
+  logAIError: (modelName: string) => {
+    const health = JSON.parse(localStorage.getItem(KEYS.IA_HEALTH) || '{}');
+    health[modelName] = { status: 'offline', lastUpdate: Date.now() };
+    localStorage.setItem(KEYS.IA_HEALTH, JSON.stringify(health));
+    storageService.addLog('SYSTEM', `Erreur critique sur le fournisseur IA : ${modelName}`);
+  },
+
+  getAIHealth: () => JSON.parse(localStorage.getItem(KEYS.IA_HEALTH) || '{}'),
+
   getAIStats: () => {
     const logs = JSON.parse(localStorage.getItem(KEYS.IA_STATS) || '[]');
     const summary: Record<string, { count: number, totalTime: number }> = {};
@@ -135,11 +148,14 @@ export const storageService = {
       summary[log.model].totalTime += log.time;
     });
 
+    const health = storageService.getAIHealth();
+
     return Object.entries(summary)
       .map(([name, data]) => ({
         name,
         count: data.count,
-        avgTime: Math.round(data.totalTime / data.count)
+        avgTime: Math.round(data.totalTime / data.count),
+        status: health[name]?.status || 'unknown'
       }))
       .sort((a, b) => b.count - a.count);
   },
@@ -150,24 +166,14 @@ export const storageService = {
     localStorage.setItem(KEYS.USER_XP, newXP.toString());
     return newXP;
   },
-  getGrade: (xp: number): string => {
-    if (xp < 200) return 'Apprenti';
-    if (xp < 800) return 'Initié';
-    if (xp < 2000) return 'Expert';
-    if (xp < 5000) return 'Maître';
-    return 'Légende Némésis';
-  },
-
   saveUserEmail: (email: string) => localStorage.setItem(KEYS.USER_EMAIL, email),
   getUserEmail: () => localStorage.getItem(KEYS.USER_EMAIL),
-
   getBannedEmails: (): string[] => JSON.parse(localStorage.getItem(KEYS.BANNED_EMAILS) || '[]'),
   isEmailBanned: (email: string): boolean => {
     const userEmail = storageService.getUserEmail();
     const isBanned = storageService.getBannedEmails().includes(email);
     return isBanned || (userEmail ? storageService.getBannedEmails().includes(userEmail) : false);
   },
-
   banEmail: (email: string): void => {
     const banned = storageService.getBannedEmails();
     if (!banned.includes(email)) {
@@ -175,70 +181,37 @@ export const storageService = {
       storageService.addLog('BAN', `Identité bannie : ${email}`);
     }
   },
-
   unbanEmail: (email: string): void => {
     const banned = storageService.getBannedEmails();
     const filtered = banned.filter(e => e !== email);
     localStorage.setItem(KEYS.BANNED_EMAILS, JSON.stringify(filtered));
     storageService.addLog('BAN', `Accès rétabli : ${email}`);
   },
-
-  sendToCloudLog: async (email: string, fileName: string, action: string = 'Téléchargement') => {
-    const payload = { 
-      email: email || 'Anonyme', 
-      action, 
-      fichier: fileName, 
-      timestamp: new Date().toLocaleString('fr-FR'),
-      xp_actuel: storageService.getUserXP()
-    };
-    try {
-      fetch(APPS_SCRIPT_WEBHOOK_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-    } catch (e) {}
-  },
-
   getAccounts: (): AdminAccount[] => {
     const data = localStorage.getItem(KEYS.ACCOUNTS);
     if (!data) {
-      const defaults: AdminAccount[] = [
-        { id: '0', username: 'Astarté', role: 'SUPER_MASTER', lastLogin: '' },
-        { id: '1', username: 'Léon', role: 'MASTER', lastLogin: '' }
-      ];
+      const defaults: AdminAccount[] = [{ id: '0', username: 'Astarté', role: 'SUPER_MASTER', lastLogin: '' }];
       localStorage.setItem(KEYS.ACCOUNTS, JSON.stringify(defaults));
       return defaults;
     }
     return JSON.parse(data);
   },
-
   addAccount: (username: string, role: AdminAccount['role']): void => {
     const accounts = storageService.getAccounts();
-    const newAccount: AdminAccount = {
-      id: Date.now().toString(),
-      username,
-      role,
-      lastLogin: ''
-    };
+    const newAccount: AdminAccount = { id: Date.now().toString(), username, role, lastLogin: '' };
     localStorage.setItem(KEYS.ACCOUNTS, JSON.stringify([...accounts, newAccount]));
   },
-
   removeAccount: (id: string): void => {
     const accounts = storageService.getAccounts();
     const filtered = accounts.filter(a => a.id !== id);
     localStorage.setItem(KEYS.ACCOUNTS, JSON.stringify(filtered));
   },
-
   getVisitorActivities: () => JSON.parse(localStorage.getItem(KEYS.VISITOR_ACTIVITY) || '[]'),
-  
   getAdvancedStats: () => {
     const activities: VisitorActivity[] = JSON.parse(localStorage.getItem(KEYS.VISITOR_ACTIVITY) || '[]');
     const docs: Document[] = JSON.parse(localStorage.getItem(KEYS.DOCUMENTS) || '[]');
     const topDocs = [...docs].sort((a, b) => b.downloads - a.downloads).slice(0, 5);
     const uniqueEmails = new Set(activities.filter(a => a.email).map(a => a.email));
-    
     const dailyStats: { [key: string]: number } = {};
     const now = new Date();
     for (let i = 0; i < 7; i++) {
@@ -246,53 +219,39 @@ export const storageService = {
         d.setDate(d.getDate() - i);
         dailyStats[d.toLocaleDateString('fr-FR')] = 0;
     }
-    
     activities.forEach(act => {
         const dateStr = act.timestamp.split(' ')[0];
         if (dailyStats.hasOwnProperty(dateStr)) dailyStats[dateStr]++;
     });
-
-    const chartData = Object.keys(dailyStats).map(date => ({ date, downloads: dailyStats[date] })).reverse();
-    return { topDocs, totalUniqueUsers: uniqueEmails.size, chartData };
+    return { topDocs, totalUniqueUsers: uniqueEmails.size, chartData: Object.keys(dailyStats).map(date => ({ date, downloads: dailyStats[date] })).reverse() };
   },
-
   getLogs: () => JSON.parse(localStorage.getItem(KEYS.LOGS) || '[]'),
   addLog: (action: any, details: string) => {
     const logs = JSON.parse(localStorage.getItem(KEYS.LOGS) || '[]');
     const newLog = { id: Date.now().toString(), action, details, timestamp: new Date().toLocaleString() };
     localStorage.setItem(KEYS.LOGS, JSON.stringify([newLog, ...logs].slice(0, 100)));
   },
-
   logVisit: (): void => {
     const email = storageService.getUserEmail();
     const activities = JSON.parse(localStorage.getItem(KEYS.VISITOR_ACTIVITY) || '[]');
     const newAct = { id: `v-${Date.now()}`, type: 'VISIT', email: email || 'Anonyme', timestamp: new Date().toLocaleString() };
     localStorage.setItem(KEYS.VISITOR_ACTIVITY, JSON.stringify([newAct, ...activities].slice(0, 500)));
-    if (email) storageService.sendToCloudLog(email, 'Site Polaris', 'Visite');
   },
-
   logPreview: (email: string | null, fileName: string) => {
     const activities = JSON.parse(localStorage.getItem(KEYS.VISITOR_ACTIVITY) || '[]');
     const newAct = { id: `p-${Date.now()}`, type: 'PREVIEW', email: email || 'Anonyme', fileName, timestamp: new Date().toLocaleString() };
     localStorage.setItem(KEYS.VISITOR_ACTIVITY, JSON.stringify([newAct, ...activities].slice(0, 500)));
-    if (email) storageService.sendToCloudLog(email, fileName, 'Consulter (Aperçu)');
   },
-
   logDownload: (email: string, fileName: string, docId?: string) => {
     const activities = JSON.parse(localStorage.getItem(KEYS.VISITOR_ACTIVITY) || '[]');
     const newAct = { id: `d-${Date.now()}`, type: 'DOWNLOAD', email, fileName, timestamp: new Date().toLocaleString() };
     localStorage.setItem(KEYS.VISITOR_ACTIVITY, JSON.stringify([newAct, ...activities].slice(0, 500)));
-    
     if (docId) {
       const history = JSON.parse(localStorage.getItem(KEYS.USER_HISTORY) || '[]');
-      if (!history.includes(docId)) {
-        localStorage.setItem(KEYS.USER_HISTORY, JSON.stringify([...history, docId]));
-      }
+      if (!history.includes(docId)) localStorage.setItem(KEYS.USER_HISTORY, JSON.stringify([...history, docId]));
     }
   },
-
   getUserHistory: (): string[] => JSON.parse(localStorage.getItem(KEYS.USER_HISTORY) || '[]'),
-
   incrementDownload: (id: string) => {
     const docs = JSON.parse(localStorage.getItem(KEYS.DOCUMENTS) || '[]');
     const idx = docs.findIndex((d: any) => d.id === id);
