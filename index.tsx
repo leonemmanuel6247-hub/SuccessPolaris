@@ -27,17 +27,18 @@ if ('serviceWorker' in navigator) {
 const removeLoader = () => {
     const loader = document.getElementById('loader');
     if (loader) {
+        // On s'assure que le contenu est bien chargé avant de retirer le voile
         loader.style.opacity = '0';
         setTimeout(() => {
             loader.style.display = 'none';
-        }, 800);
+        }, 1200);
     }
 };
 
-if (document.readyState === 'complete') {
-    removeLoader();
-} else {
-    window.addEventListener('load', removeLoader);
-}
+// On laisse le loader au moins 3.5 secondes pour l'effet d'immersion
+window.addEventListener('load', () => {
+    setTimeout(removeLoader, 3500);
+});
 
-setTimeout(removeLoader, 3000);
+// Sécurité au cas où l'événement load tarde trop
+setTimeout(removeLoader, 6000);

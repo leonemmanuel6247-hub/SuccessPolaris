@@ -12,11 +12,13 @@ interface AdminDashboardProps {
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, currentAdmin, onRefresh }) => {
-  const [activeTab, setActiveTab] = useState<'status' | 'stats' | 'architect' | 'spy' | 'keys' | 'logs'>('status');
+  const [activeTab, setActiveTab] = useState<'status' | 'stats' | 'architect' | 'spy' | 'ai_core' | 'keys' | 'logs'>('status');
   const [activities, setActivities] = useState<VisitorActivity[]>([]);
   const [accounts, setAccounts] = useState<AdminAccount[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [bannedList, setBannedList] = useState<string[]>([]);
+  const [aiStats, setAIStats] = useState<any[]>([]);
+  const [iaMemory, setIaMemory] = useState('');
 
   // Wizard state
   const [publishStep, setPublishStep] = useState(0);
@@ -35,7 +37,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
     setActivities(storageService.getVisitorActivities());
     setAccounts(storageService.getAccounts());
     setBannedList(storageService.getBannedEmails());
+    setAIStats(storageService.getAIStats());
+    setIaMemory(storageService.getIAMemory());
   }, []);
+
+  const handleSaveMemory = () => {
+    storageService.saveIAMemory(iaMemory);
+    storageService.addLog('CONFIG', `Mémoire du Nexus mise à jour.`);
+    alert("🧠 Mémoire synchronisée avec le Cœur de l'IA.");
+  };
 
   const handleManualSync = async () => {
     setIsSyncing(true);
@@ -89,6 +99,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
         {[
           { id: 'status', label: 'Matrice', icon: '☁️' },
           { id: 'stats', label: 'Analyse', icon: '📊' },
+          { id: 'ai_core', label: 'Nexus AI', icon: '🧠' },
           { id: 'architect', label: 'Architecte', icon: '🏛️' },
           { id: 'spy', label: 'Espionnage', icon: '👁️' },
           ...(currentAdmin?.role === 'SUPER_MASTER' ? [{ id: 'keys', label: 'Clés', icon: '🔑' }] : []),
@@ -124,6 +135,50 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
         )}
 
         {activeTab === 'stats' && <AdminStats />}
+
+        {activeTab === 'ai_core' && (
+          <div className="space-y-12 animate-in">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="bg-slate-900/40 p-8 rounded-[2rem] border border-white/10">
+                   <h4 className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mb-6 italic">Performance des Modèles</h4>
+                   <div className="space-y-4">
+                      {aiStats.map((stat, idx) => (
+                        <div key={stat.name} className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5">
+                           <div>
+                              <p className="text-white font-black text-[12px] uppercase">
+                                 {idx === 0 && '🥇 '}{idx === 1 && '🥈 '}{stat.name}
+                              </p>
+                              <p className="text-[8px] text-white/30 uppercase font-black">{stat.count} RÉPONSES</p>
+                           </div>
+                           <div className="text-right">
+                              <p className="text-cyan-400 font-mono font-bold">{stat.avgTime}ms</p>
+                              <p className="text-[7px] text-white/20 uppercase font-black tracking-widest">RÉFLEXION</p>
+                           </div>
+                        </div>
+                      ))}
+                      {aiStats.length === 0 && <p className="text-[9px] text-white/20 text-center py-4">AUCUNE DONNÉE IA DISPONIBLE</p>}
+                   </div>
+                </div>
+
+                <div className="bg-slate-900/40 p-8 rounded-[2rem] border border-white/10 flex flex-col">
+                   <h4 className="text-[10px] font-black text-white uppercase tracking-widest mb-6 italic">Souvenirs du Nexus</h4>
+                   <p className="text-[8px] text-white/30 uppercase font-black mb-4">Directives permanentes du subconscient IA :</p>
+                   <textarea 
+                     value={iaMemory} 
+                     onChange={(e) => setIaMemory(e.target.value)}
+                     className="flex-1 bg-black/60 border border-white/10 rounded-2xl p-6 text-white text-[11px] outline-none focus:border-cyan-400 min-h-[150px] font-mono leading-relaxed"
+                     placeholder="Votre créateur est Astarté Léon..."
+                   ></textarea>
+                   <button 
+                     onClick={handleSaveMemory}
+                     className="mt-6 bg-cyan-500 text-slate-950 py-4 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-neon"
+                   >
+                     Synchroniser la Mémoire
+                   </button>
+                </div>
+             </div>
+          </div>
+        )}
 
         {activeTab === 'architect' && (
           <div className="max-w-4xl mx-auto w-full space-y-12 animate-in py-6">

@@ -7,129 +7,142 @@ const AuroraBackground: React.FC = () => {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
 
     let animationFrameId: number;
-    let mouse = { x: -1000, y: -1000 };
+    let stars: Star[] = [];
+    
+    const isMobile = window.innerWidth < 768;
+    const starCount = isMobile ? 10000 : 30000;
+    const arms = 5; 
+    const coreRadius = 40;
 
-    const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
+    class Star {
+      x: number = 0;
+      y: number = 0;
+      angle: number = 0;
+      dist: number = 0;
+      speed: number = 0;
+      size: number = 0;
+      color: string = '';
+      opacity: number = 0;
+      twinkleSpeed: number = 0;
 
-    const handleMouseMove = (e: MouseEvent) => {
-      mouse.x = e.clientX;
-      mouse.y = e.clientY;
-    };
+      constructor(w: number, h: number) {
+        this.reset(w, h, true);
+      }
 
-    window.addEventListener('resize', resize);
-    window.addEventListener('mousemove', handleMouseMove);
-    resize();
+      reset(w: number, h: number, isInitial = false) {
+        const maxDist = Math.max(w, h);
+        this.dist = isInitial 
+          ? Math.random() * maxDist
+          : maxDist * 0.8;
+        
+        const armIndex = Math.floor(Math.random() * arms);
+        const armAngle = (armIndex * (Math.PI * 2)) / arms;
+        this.angle = armAngle + (this.dist * 0.003) + (Math.random() * 0.5);
+        
+        this.speed = 0.02 + Math.random() * 0.05;
+        this.size = Math.random() * 1.2 + 0.2;
+        this.twinkleSpeed = Math.random() * 0.08;
 
-    const stars: any[] = [];
-    for(let i=0; i<200; i++) {
-        stars.push({
-            x: Math.random() * canvas.width,
-            y: Math.random() * canvas.height,
-            vx: (Math.random() - 0.5) * 0.08,
-            vy: (Math.random() - 0.5) * 0.08,
-            size: Math.random() * 1.8 + 0.2,
-            color: Math.random() > 0.8 ? '#00d4ff' : '#ffffff',
-            opacity: Math.random(),
-            pulse: Math.random() * 0.02
-        });
+        // Palette Nexus : Cyan, Bleu, Blanc Cristal
+        const rand = Math.random();
+        if (rand > 0.7) this.color = '#00d4ff'; // Cyan
+        else if (rand > 0.4) this.color = '#3b82f6'; // Bleu
+        else this.color = '#ffffff'; // Blanc
+      }
+
+      update(w: number, h: number) {
+        this.dist -= (1.2 + (1000 / (this.dist + 1)));
+        this.angle -= this.speed * (400 / (this.dist + 100));
+        
+        if (this.dist < coreRadius) {
+          this.reset(w, h, false);
+        }
+
+        const pulse = Math.sin(Date.now() * this.twinkleSpeed) * 0.3 + 0.7;
+        this.opacity = (Math.min(1, this.dist / 400)) * pulse;
+
+        const centerX = w / 2;
+        const centerY = h / 2;
+        this.x = centerX + Math.cos(this.angle) * this.dist;
+        this.y = centerY + Math.sin(this.angle) * this.dist * 0.7;
+      }
+
+      draw(context: CanvasRenderingContext2D) {
+        context.globalAlpha = this.opacity * 0.8;
+        context.fillStyle = this.color;
+        context.beginPath();
+        context.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        context.fill();
+      }
     }
 
-    const draw = (time: number) => {
+    const init = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      stars = [];
+      for (let i = 0; i < starCount; i++) {
+        stars.push(new Star(canvas.width, canvas.height));
+      }
+    };
+
+    window.addEventListener('resize', init);
+    init();
+
+    const render = () => {
+      ctx.globalCompositeOperation = 'source-over';
       ctx.fillStyle = '#020617';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Deep Space Glows
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
-      
-      const grad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, canvas.width * 0.8);
-      grad.addColorStop(0, 'rgba(0, 50, 100, 0.1)');
-      grad.addColorStop(0.5, 'rgba(10, 20, 40, 0.05)');
-      grad.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = grad;
+      // Nébuleuse Cyan Profond
+      const gradient = ctx.createRadialGradient(
+        canvas.width/2, canvas.height/2, 0,
+        canvas.width/2, canvas.height/2, canvas.width/1.2
+      );
+      gradient.addColorStop(0, 'rgba(0, 212, 255, 0.1)');
+      gradient.addColorStop(0.4, 'rgba(59, 130, 246, 0.05)');
+      gradient.addColorStop(1, 'transparent');
+      ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Constellation Lines
-      ctx.lineWidth = 0.4;
-      for(let i=0; i<stars.length; i++) {
-        const s1 = stars[i];
-        for(let j=i+1; j<stars.length; j++) {
-            const s2 = stars[j];
-            const dx = s1.x - s2.x;
-            const dy = s1.y - s2.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            
-            if(dist < 120) {
-                const opacity = (1 - dist/120) * 0.15;
-                ctx.strokeStyle = `rgba(0, 212, 255, ${opacity})`;
-                ctx.beginPath();
-                ctx.moveTo(s1.x, s1.y);
-                ctx.lineTo(s2.x, s2.y);
-                ctx.stroke();
-            }
-        }
-
-        // Mouse connection
-        const mdx = s1.x - mouse.x;
-        const mdy = s1.y - mouse.y;
-        const mdist = Math.sqrt(mdx * mdx + mdy * mdy);
-        if (mdist < 150) {
-            ctx.strokeStyle = `rgba(0, 212, 255, ${(1 - mdist/150) * 0.3})`;
-            ctx.lineWidth = 0.8;
-            ctx.beginPath();
-            ctx.moveTo(s1.x, s1.y);
-            ctx.lineTo(mouse.x, mouse.y);
-            ctx.stroke();
-            ctx.lineWidth = 0.4;
-        }
-      }
-
-      // Stars
-      stars.forEach(s => {
-        s.x += s.vx;
-        s.y += s.vy;
-        if(s.x < -20) s.x = canvas.width + 20;
-        if(s.x > canvas.width + 20) s.x = -20;
-        if(s.y < -20) s.y = canvas.height + 20;
-        if(s.y > canvas.height + 20) s.y = -20;
-
-        const currentOpacity = s.opacity * (0.4 + Math.sin(time * 0.002 + s.x) * 0.6);
-        ctx.globalAlpha = currentOpacity;
-        ctx.fillStyle = s.color;
-        
-        // Draw star with glow
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
-        ctx.fill();
-        
-        if (s.size > 1.2) {
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = s.color;
-            ctx.fill();
-            ctx.shadowBlur = 0;
-        }
+      ctx.globalCompositeOperation = 'lighter';
+      stars.forEach(star => {
+        star.update(canvas.width, canvas.height);
+        star.draw(ctx);
       });
 
-      ctx.globalAlpha = 1;
-      animationFrameId = requestAnimationFrame(draw);
+      animationFrameId = requestAnimationFrame(render);
     };
 
-    animationFrameId = requestAnimationFrame(draw);
+    render();
     return () => {
-      window.removeEventListener('resize', resize);
-      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('resize', init);
       cancelAnimationFrame(animationFrameId);
     };
   }, []);
 
-  return <canvas ref={canvasRef} className="fixed inset-0 z-[-1]" />;
+  return (
+    <div className="fixed inset-0 z-[-1] pointer-events-none select-none overflow-hidden bg-[#020617]">
+      <canvas ref={canvasRef} className="absolute inset-0" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.4)_100%)]"></div>
+      
+      {/* Glow Cyan */}
+      <div className="absolute inset-0 flex items-center justify-center opacity-20">
+         <div className="w-[400px] h-[400px] bg-cyan-500/20 blur-[150px] rounded-full animate-pulse-slow"></div>
+      </div>
+
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); opacity: 0.15; }
+          50% { transform: scale(1.2); opacity: 0.25; }
+        }
+        .animate-pulse-slow { animation: pulse 10s ease-in-out infinite; }
+      `}</style>
+    </div>
+  );
 };
 
 export default AuroraBackground;

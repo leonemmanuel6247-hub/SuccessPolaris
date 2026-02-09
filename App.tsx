@@ -30,44 +30,28 @@ const App: React.FC = () => {
   const [viewerDoc, setViewerDoc] = useState<Document | null>(null);
   const [userEmail, setUserEmail] = useState('');
 
-  const syncCounter = async () => {
-    try {
-      const count = await storageService.chargerCompteur();
-      if (count !== undefined) setTotalCount(count);
-    } catch (e) {
-      console.warn("Échec silencieux du Canal Compteur.");
-    }
-  };
-
   const syncDocs = async () => {
     setIsSyncing(true);
-    const cachedDocs = localStorage.getItem('sp_documents');
-    const cachedCats = localStorage.getItem('sp_categories');
-    const cachedCount = localStorage.getItem('sp_document_total_count');
-    
-    if (cachedDocs && cachedCats) {
-      setDocuments(JSON.parse(cachedDocs));
-      setCategories(JSON.parse(cachedCats));
-      setTotalCount(parseInt(cachedCount || '0'));
-      setIsSyncing(false); 
-    }
-
     try {
       const data = await storageService.fetchFromSheets();
       if (data.documents.length > 0) {
         setCategories(data.categories);
         setDocuments(data.documents);
+        setTotalCount(data.documents.length);
+      } else {
+        const externalCount = await storageService.chargerCompteur();
+        setTotalCount(externalCount);
       }
-    } catch (err) {
-      console.error("Erreur synchro:", err);
-    } finally {
-      setIsSyncing(false);
+    } catch (err) { 
+      console.error("Nexus Sync Error:", err); 
+    } 
+    finally { 
+      setIsSyncing(false); 
     }
   };
 
   useEffect(() => {
     syncDocs();
-    syncCounter();
     storageService.logVisit(); 
     setUserXP(storageService.getUserXP());
     const savedEmail = storageService.getUserEmail();
@@ -75,33 +59,22 @@ const App: React.FC = () => {
   }, []);
 
   const handlePreview = (doc: Document) => {
-    const savedEmail = storageService.getUserEmail();
-    storageService.logPreview(savedEmail, doc.title);
+    storageService.logPreview(storageService.getUserEmail(), doc.title);
     setViewerDoc(doc);
   };
 
   const handleObtain = (doc: Document) => {
-    if (!doc.fileUrl) return;
     setPendingDoc(doc);
     const savedEmail = storageService.getUserEmail();
-    if (!savedEmail) {
-      setShowEmailModal(true);
-    } else {
-      processFullAccess(savedEmail, doc);
-    }
+    if (!savedEmail) setShowEmailModal(true);
+    else processFullAccess(savedEmail, doc);
   };
 
   const processFullAccess = (email: string, doc: Document) => {
-    if (storageService.isEmailBanned(email)) {
-      alert("⚠️ VOTRE IDENTITÉ EST RÉVOQUÉE. CONTACTEZ L'ADMINISTRATION POLARIS.");
-      return;
-    }
+    if (storageService.isEmailBanned(email)) return alert("Accès Révoqué par le Protocole.");
     storageService.logDownload(email, doc.title, doc.id);
     storageService.incrementDownload(doc.id);
-    storageService.sendToCloudLog(email, doc.title, 'Acquisition Nexus');
-    
-    const newXP = storageService.addXP(25);
-    setUserXP(newXP);
+    setUserXP(storageService.addXP(25));
     setViewerDoc(doc);
   };
 
@@ -116,14 +89,7 @@ const App: React.FC = () => {
 
   const navigateTo = (cat: Category | null) => {
     setViewMode('archives');
-    if (!cat) setNavigationPath([]);
-    else setNavigationPath([...navigationPath, cat]);
-    setSearchQuery('');
-  };
-
-  const goBackTo = (index: number | null) => {
-    if (index === null) setNavigationPath([]);
-    else setNavigationPath(navigationPath.slice(0, index + 1));
+    setNavigationPath(cat ? [...navigationPath, cat] : []);
     setSearchQuery('');
   };
 
@@ -135,152 +101,121 @@ const App: React.FC = () => {
   const displayedDocuments = useMemo(() => {
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      return documents.filter(d => 
-        d.title.toLowerCase().includes(q) || 
-        d.description.toLowerCase().includes(q)
-      );
+      return documents.filter(d => d.title.toLowerCase().includes(q));
     }
     if (viewMode === 'library') {
-      const historyIds = storageService.getUserHistory();
-      return documents.filter(doc => historyIds.includes(doc.id));
+      const history = storageService.getUserHistory();
+      return documents.filter(doc => history.includes(doc.id));
     }
     if (navigationPath.length === 0) return [];
     const lastCatId = navigationPath[navigationPath.length - 1].id;
     return documents.filter(doc => doc.categoryId === lastCatId);
   }, [documents, navigationPath, searchQuery, viewMode]);
 
-  const handleAdminLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    const accounts = storageService.getAccounts();
-    const user = accounts.find(a => a.username.toLowerCase() === adminUsername.toLowerCase());
-    let isAuthorized = (adminUsername.toLowerCase() === 'astarté' && adminPassword === '2008') || (adminUsername.toLowerCase() === 'léon' && adminPassword === 'mazedxn7');
-    
-    if (isAuthorized && user) {
-      setIsAdminMode(true);
-      setCurrentAdmin(user);
-      setShowAdminLogin(false);
-      setAdminUsername('');
-      setAdminPassword('');
-      storageService.addLog('AUTH', `Terminal débloqué par ${user.username}`);
-    } else {
-      setLoginError(true);
-      setTimeout(() => setLoginError(false), 3000);
-    }
-  };
-
-  const userGrade = storageService.getGrade(userXP);
-
   return (
-    <div className="min-h-screen text-slate-100 font-['Inter'] relative overflow-x-hidden pb-24">
+    <div className="min-h-screen text-slate-200 selection:bg-cyan-500/30">
       <AuroraBackground />
       <ExamCountdown />
-      
-      <PolarisBrain 
-        count={totalCount} 
-        documents={documents}
-        categories={categories}
-      />
-      
+      <PolarisBrain count={totalCount} documents={documents} categories={categories} />
       {viewerDoc && <PDFViewer doc={viewerDoc} onClose={() => setViewerDoc(null)} />}
 
-      <header className="container mx-auto px-6 py-12 flex flex-col items-center gap-12 relative z-50">
-        <div className="w-full flex flex-col md:flex-row justify-between items-center gap-8 max-w-6xl">
-           <div className="flex flex-col items-center gap-6 cursor-pointer group" onClick={() => navigateTo(null)}>
-              <div className="w-16 h-16 bg-slate-900/90 border border-white/10 rounded-[1.8rem] flex items-center justify-center relative shadow-neon group-hover:scale-110 transition-all duration-700">
-                 <i className="fas fa-star text-cyan-400 text-xl group-hover:rotate-[360deg] transition-all duration-1000"></i>
-              </div>
-              <h1 className="text-2xl font-black tracking-tighter text-white uppercase italic drop-shadow-neon">
-                Success<span className="text-cyan-400">Polaris</span>
-              </h1>
-           </div>
+      <style>{`
+        @keyframes admin-pulse {
+          0%, 100% { opacity: 0.3; transform: scale(1); filter: blur(0px); }
+          50% { opacity: 1; transform: scale(1.05); filter: drop-shadow(0 0 10px rgba(0, 212, 255, 0.8)); }
+        }
+        .animate-admin-glow {
+          animation: admin-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+      `}</style>
 
-           <div className="flex items-center gap-4">
-              <div id="affichage-stats" className="bg-slate-950/60 backdrop-blur-2xl border border-cyan-500/20 p-4 rounded-[2rem] flex items-center gap-5 shadow-2xl border-l-cyan-500/50">
-                 <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center border border-cyan-400/20 shadow-neon">
-                    <i className="fas fa-database text-cyan-400 text-sm"></i>
-                 </div>
-                 <div className="flex flex-col">
-                    <p className="text-[7px] font-black uppercase text-cyan-400/60 tracking-[0.2em]">Base Nexus</p>
-                    <p className="text-[14px] font-black text-white uppercase tracking-tight">
-                       <span>{totalCount}</span> <span className="text-[9px] text-white/40 italic">Archives</span>
-                    </p>
-                 </div>
-              </div>
-
-              <div className="bg-slate-950/60 backdrop-blur-2xl border border-white/10 p-4 rounded-[2rem] flex items-center gap-6 shadow-xl">
-                  <div className="text-right hidden sm:block">
-                    <p className="text-[10px] font-black uppercase text-cyan-400">{userGrade}</p>
-                    <p className="text-[8px] text-white/40 uppercase font-black">{userXP} XP ACQUIS</p>
+      <header className="container mx-auto px-6 py-16 flex flex-col items-center gap-12 relative z-50">
+        {!isAdminMode && (
+          <>
+            <div className="w-full flex flex-col md:flex-row justify-between items-center gap-8 max-w-6xl">
+               <div className="flex flex-col items-center gap-2 cursor-pointer group" onClick={() => navigateTo(null)}>
+                  <div className="w-16 h-16 bg-gradient-to-br from-cyan-400/20 to-blue-600/5 backdrop-blur-2xl border border-cyan-500/20 rounded-[2rem] flex items-center justify-center shadow-[0_0_30px_rgba(0,212,255,0.2)] group-hover:scale-105 transition-all duration-500">
+                     <i className="fas fa-atom text-cyan-400 text-2xl group-hover:rotate-180 transition-transform duration-1000"></i>
                   </div>
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-indigo-600 flex items-center justify-center shadow-neon">
-                    <i className="fas fa-user-shield text-slate-950"></i>
-                  </div>
-              </div>
-           </div>
-        </div>
+                  <h1 className="text-2xl font-black tracking-widest text-white uppercase italic">
+                    Success<span className="text-cyan-400">Polaris</span>
+                  </h1>
+               </div>
 
-        <div className="w-full max-w-xl px-2 relative group">
-           <div className="relative flex items-center bg-slate-950/70 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] p-1.5 focus-within:border-cyan-400/40 transition-all shadow-2xl">
-              <i className="fas fa-search text-white/20 ml-8"></i>
-              <input 
-                type="text" 
-                placeholder="Scanner les archives de la Matrice..." 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex-1 bg-transparent px-6 py-5 text-[14px] outline-none font-bold text-white placeholder-white/20" 
-              />
-           </div>
-        </div>
+               <div className="flex items-center gap-4">
+                  <div className="bg-white/5 backdrop-blur-2xl border border-white/10 p-4 rounded-[1.5rem] flex items-center gap-4 shadow-xl">
+                     <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center border border-cyan-500/20">
+                        <i className="fas fa-database text-cyan-400 text-sm"></i>
+                     </div>
+                     <div className="flex flex-col">
+                        <p className="text-[7px] font-black uppercase text-cyan-400/60 tracking-widest">Flux Archives</p>
+                        <p className="text-[14px] font-black text-white">{totalCount} items</p>
+                     </div>
+                  </div>
+               </div>
+            </div>
+
+            <div className="w-full max-w-xl relative">
+               <div className="relative flex items-center bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[2rem] p-1.5 focus-within:border-cyan-400 transition-all shadow-2xl">
+                  <i className="fas fa-search text-cyan-400/30 ml-6"></i>
+                  <input 
+                    type="text" 
+                    placeholder="Scanner les archives du savoir..." 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="flex-1 bg-transparent px-5 py-4 text-[14px] outline-none font-medium text-white placeholder-white/20" 
+                  />
+               </div>
+            </div>
+          </>
+        )}
       </header>
 
-      <main className="container mx-auto px-6 lg:px-24 relative z-10">
+      <main className="container mx-auto px-6 lg:px-20 pb-32">
         {isAdminMode ? (
-          <div className="animate-in">
-            <button onClick={() => setIsAdminMode(false)} className="text-[10px] font-black uppercase tracking-widest text-cyan-400 mb-8 flex items-center gap-3">
-              <i className="fas fa-arrow-left"></i> Quitter le Terminal
-            </button>
-            <AdminDashboard categories={categories} documents={documents} currentAdmin={currentAdmin} onRefresh={syncDocs} />
+          <div className="relative z-50 animate-in fade-in slide-in-from-bottom-10 duration-700">
+             <div className="flex items-center justify-between mb-8">
+                <button onClick={() => setIsAdminMode(false)} className="flex items-center gap-3 text-cyan-400 font-black uppercase text-[10px] tracking-widest hover:translate-x-[-5px] transition-all bg-cyan-500/5 px-6 py-3 rounded-xl border border-cyan-500/10">
+                   <i className="fas fa-arrow-left"></i> Quitter la Matrice
+                </button>
+                <div className="flex items-center gap-2 text-white/20 text-[8px] font-black uppercase tracking-widest italic">
+                  Connecté en tant que {adminUsername}
+                </div>
+             </div>
+             <AdminDashboard categories={categories} documents={documents} currentAdmin={currentAdmin} onRefresh={syncDocs} />
           </div>
         ) : (
-          <div className="space-y-16 animate-in">
+          <div className="space-y-12">
             {!searchQuery && (
-              <nav className="flex items-center gap-4 overflow-x-auto no-scrollbar py-6 px-10 bg-slate-950/40 rounded-[3rem] border border-white/5 backdrop-blur-3xl">
-                <button onClick={() => { setViewMode('archives'); setNavigationPath([]); }} className={`px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'archives' && navigationPath.length === 0 ? 'bg-cyan-500 text-slate-950 shadow-neon' : 'text-white/30 hover:text-white'}`}>Archives</button>
-                <button onClick={() => setViewMode('library')} className={`px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${viewMode === 'library' ? 'bg-indigo-500 text-white shadow-[0_0_20px_rgba(99,102,241,0.4)]' : 'text-white/30 hover:text-white'}`}>Ma Bibliothèque</button>
-                <div className="h-6 w-px bg-white/10 mx-2"></div>
+              <nav className="flex items-center gap-3 overflow-x-auto no-scrollbar py-2">
+                <button onClick={() => { setViewMode('archives'); setNavigationPath([]); }} className={`px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'archives' && navigationPath.length === 0 ? 'bg-cyan-500 text-black shadow-[0_0_20px_rgba(0,212,255,0.4)]' : 'bg-white/5 text-white/40 hover:text-white'}`}>Secteurs</button>
+                <button onClick={() => setViewMode('library')} className={`px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'library' ? 'bg-cyan-500 text-black shadow-[0_0_20px_rgba(0,212,255,0.4)]' : 'bg-white/5 text-white/40 hover:text-white'}`}>Mon Index</button>
                 {navigationPath.map((cat, i) => (
-                  <button key={cat.id} onClick={() => goBackTo(i)} className={`px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${i === navigationPath.length - 1 ? 'bg-white text-slate-950' : 'text-white/30'}`}>{cat.name}</button>
+                  <button key={cat.id} onClick={() => setNavigationPath(navigationPath.slice(0, i + 1))} className="px-6 py-3 rounded-2xl bg-cyan-400/10 border border-cyan-400/20 text-cyan-400 text-[10px] font-black uppercase tracking-widest whitespace-nowrap">{cat.name}</button>
                 ))}
               </nav>
             )}
 
-            <div id="affichage-liste" className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
               {viewMode === 'archives' && !searchQuery && currentLevelCategories.length > 0 && (
-                <div className="lg:col-span-4 space-y-6">
+                <div className="lg:col-span-3 grid grid-cols-1 gap-4">
                   {currentLevelCategories.map(cat => (
-                    <button key={cat.id} onClick={() => navigateTo(cat)} className="w-full flex items-center justify-between p-8 bg-slate-900/30 border border-white/5 rounded-[2.5rem] group hover:bg-cyan-500/5 transition-all">
-                      <span className="text-[14px] font-black text-white/80 group-hover:text-cyan-400 uppercase">{cat.name}</span>
-                      <i className="fas fa-arrow-right text-white/5 group-hover:text-cyan-400 group-hover:translate-x-2 transition-all"></i>
+                    <button key={cat.id} onClick={() => navigateTo(cat)} className="w-full flex items-center justify-between p-6 bg-white/5 border border-white/10 rounded-3xl group hover:bg-cyan-500 hover:text-black transition-all duration-500">
+                      <span className="text-[11px] font-black uppercase tracking-widest">{cat.name}</span>
+                      <i className="fas fa-chevron-right text-[10px] opacity-20 group-hover:opacity-100"></i>
                     </button>
                   ))}
                 </div>
               )}
-              <div className={`${(searchQuery || viewMode === 'library' || currentLevelCategories.length === 0) ? 'lg:col-span-12' : 'lg:col-span-8'} grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8`}>
+              <div className={`${(searchQuery || viewMode === 'library' || (viewMode === 'archives' && currentLevelCategories.length === 0)) ? 'lg:col-span-12' : 'lg:col-span-9'} grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8`}>
                 {displayedDocuments.length > 0 ? (
                   displayedDocuments.map(doc => (
-                    <DocumentCard 
-                      key={doc.id} 
-                      doc={doc} 
-                      onPreview={handlePreview} 
-                      onDownload={handleObtain} 
-                    />
+                    <DocumentCard key={doc.id} doc={doc} onPreview={handlePreview} onDownload={handleObtain} />
                   ))
                 ) : (
-                  <div className="col-span-full py-24 text-center">
-                     <i className="fas fa-box-open text-white/5 text-5xl mb-6"></i>
-                     <p className="text-white/10 text-[10px] font-black uppercase tracking-[1em]">
-                        {viewMode === 'library' ? "Bibliothèque vide" : "Aucune archive trouvée"}
-                     </p>
+                  <div className="col-span-full py-20 text-center">
+                     <i className="fas fa-satellite-dish text-white/10 text-4xl mb-6"></i>
+                     <p className="text-[10px] text-white/30 uppercase font-black tracking-widest">Aucune donnée détectée dans ce secteur</p>
                   </div>
                 )}
               </div>
@@ -289,54 +224,59 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <footer className="fixed bottom-0 left-0 w-full py-4 px-12 bg-slate-950/90 backdrop-blur-3xl border-t border-white/5 flex items-center justify-between z-[1000]">
-        <p className="text-[8px] text-white/30 font-black uppercase tracking-[0.4em]">SuccessPolaris — Palais v2.1.0 (Conscience IA)</p>
-        <button onClick={() => setShowAdminLogin(true)} className="text-[8px] text-white/20 font-black uppercase tracking-widest hover:text-cyan-400 transition-all">DÉVELOPPÉ PAR ASTARTÉ</button>
+      <footer className="fixed bottom-0 left-0 w-full py-6 px-12 bg-black/90 backdrop-blur-3xl border-t border-white/5 flex items-center justify-between z-[1000]">
+        <p className="text-[8px] text-cyan-400/10 font-black uppercase tracking-[0.5em]">POLARIS PROTOCOL // NEXUS V2.6</p>
+        
+        {/* PORTE DÉROBÉE ADMIN : Plus visible et CLIGNOTANTE */}
+        <button 
+          onClick={() => setShowAdminLogin(true)} 
+          className="group flex items-center gap-1.5 transition-all duration-500 cursor-pointer"
+        >
+          <span className="text-[8px] text-white/20 font-black uppercase tracking-widest italic transition-colors group-hover:text-white/40">Nexus Root :</span>
+          <span className="text-[9px] text-cyan-400 font-black uppercase tracking-widest animate-admin-glow transition-all select-none">
+            Astarté Léon
+          </span>
+        </button>
       </footer>
 
       {showEmailModal && (
-        <div className="fixed inset-0 z-[9000] flex items-center justify-center bg-slate-950/98 backdrop-blur-3xl p-6">
-          <div className="max-w-[440px] w-full p-12 bg-slate-900/60 border border-white/15 rounded-[4rem] relative shadow-3xl text-center">
-            <div className="w-16 h-16 bg-cyan-500/10 rounded-full flex items-center justify-center mx-auto mb-8 border border-cyan-500/30">
-               <i className="fas fa-fingerprint text-cyan-400 text-2xl"></i>
-            </div>
-            <h3 className="text-sm font-black text-white uppercase italic tracking-[0.4em] mb-4">Identification Nexus</h3>
-            <p className="text-[9px] text-white/40 uppercase font-black tracking-widest mb-10 leading-relaxed">
-               Cette action ne sera requise qu'une seule fois.<br/>Rejoignez la Matrice pour débloquer l'accès complet.
-            </p>
-            <form onSubmit={handleIdentityConfirm} className="space-y-8">
-              <input 
-                type="email" 
-                required 
-                placeholder="votre@gmail.com" 
-                value={userEmail} 
-                onChange={e => setUserEmail(e.target.value)} 
-                className="w-full bg-black/70 border border-white/10 rounded-[1.8rem] px-8 py-6 text-white text-center font-black outline-none focus:border-cyan-400 transition-all" 
-              />
-              <button type="submit" className="w-full bg-cyan-500 text-slate-950 font-black py-7 rounded-[1.8rem] uppercase text-[11px] tracking-[0.5em] shadow-neon hover:bg-white transition-all">Activer le Profil</button>
+        <div className="fixed inset-0 z-[9000] flex items-center justify-center bg-black/95 p-6">
+          <div className="max-w-md w-full p-12 bg-white/5 border border-cyan-500/20 rounded-[3rem] text-center shadow-2xl backdrop-blur-3xl">
+            <h3 className="text-xl font-black text-white uppercase italic mb-4">Initialisation du Canal</h3>
+            <p className="text-[10px] text-cyan-100/40 uppercase font-black mb-10 leading-relaxed">Confirmez votre identité pour synchroniser l'archive Polaris.</p>
+            <form onSubmit={handleIdentityConfirm} className="space-y-6">
+              <input type="email" required placeholder="votre-id@nexus.com" value={userEmail} onChange={e => setUserEmail(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-2xl px-8 py-5 text-white text-center font-bold outline-none focus:border-cyan-400" />
+              <button type="submit" className="w-full bg-cyan-500 text-black font-black py-5 rounded-2xl uppercase text-[11px] tracking-widest shadow-lg shadow-cyan-500/20 hover:bg-cyan-400 transition-all">Débloquer le Flux</button>
             </form>
           </div>
         </div>
       )}
 
       {showAdminLogin && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/98 backdrop-blur-3xl p-6">
-          <div className="max-w-[380px] w-full p-12 bg-slate-900/50 border-2 border-cyan-500/20 rounded-[4rem] relative shadow-neon">
-            <button onClick={() => setShowAdminLogin(false)} className="absolute top-10 right-10 text-white/20 hover:text-white text-2xl">×</button>
-            <form onSubmit={handleAdminLogin} className="space-y-8 text-center">
-              <input type="text" placeholder="Utilisateur" value={adminUsername} onChange={e => setAdminUsername(e.target.value)} className="w-full bg-black/80 border border-white/10 rounded-[1.8rem] px-8 py-6 text-white text-center font-black outline-none focus:border-cyan-400" />
-              <input type="password" placeholder="Code" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} className="w-full bg-black/80 border border-white/10 rounded-[1.8rem] px-8 py-6 text-white text-center font-black outline-none focus:border-cyan-400" />
-              {loginError && <p className="text-red-500 text-[9px] font-black uppercase">Échec</p>}
-              <button type="submit" className="w-full bg-white text-slate-950 font-black py-7 rounded-[1.8rem] uppercase tracking-[0.4em] shadow-xl">Entrer</button>
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/95 p-6 backdrop-blur-2xl">
+          <div className="max-w-sm w-full p-12 bg-[#020617] border border-cyan-500/20 rounded-[3rem] text-center shadow-[0_0_100px_rgba(0,212,255,0.1)] relative animate-in zoom-in-95 duration-300">
+            <button onClick={() => setShowAdminLogin(false)} className="absolute top-10 right-10 text-white/20 hover:text-white text-2xl transition-colors">×</button>
+            <div className="w-20 h-20 bg-cyan-500/10 border border-cyan-500/20 rounded-3xl flex items-center justify-center mx-auto mb-10">
+               <i className="fas fa-terminal text-cyan-400 text-3xl"></i>
+            </div>
+            <h3 className="text-lg font-black text-cyan-400 uppercase italic tracking-widest mb-10">Terminal Racine</h3>
+            <form onSubmit={(e) => { 
+              e.preventDefault(); 
+              if(adminUsername === 'mazedxn7' && adminPassword === 'léon') {
+                setIsAdminMode(true);
+                setShowAdminLogin(false);
+                setLoginError(false);
+                setCurrentAdmin({ id: '0', username: 'Astarté', role: 'SUPER_MASTER', lastLogin: new Date().toISOString() });
+              } else {
+                setLoginError(true);
+              } 
+            }} className="space-y-6">
+              <input type="text" placeholder="Admin_ID" value={adminUsername} onChange={e => setAdminUsername(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-2xl px-8 py-5 text-white text-center font-black outline-none focus:border-cyan-400 transition-all" autoComplete="off" />
+              <input type="password" placeholder="Pass_Key" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-2xl px-8 py-5 text-white text-center font-black outline-none focus:border-cyan-400 transition-all" autoComplete="off" />
+              {loginError && <p className="text-red-500 text-[10px] font-black uppercase animate-pulse">Accès Refusé par le Nexus</p>}
+              <button type="submit" className="w-full bg-cyan-500 text-black font-black py-5 rounded-2xl uppercase tracking-[0.2em] shadow-lg shadow-cyan-500/20 hover:bg-cyan-400 active:scale-95 transition-all">Connecter</button>
             </form>
           </div>
-        </div>
-      )}
-
-      {isSyncing && (
-        <div className="fixed inset-0 z-[20000] flex flex-col items-center justify-center bg-slate-950/98 backdrop-blur-3xl">
-           <div className="w-20 h-20 border-2 border-t-cyan-500 rounded-full animate-spin"></div>
-           <p className="text-cyan-400 text-[9px] font-black uppercase tracking-[1.5em] mt-10">Initialisation Nexus...</p>
         </div>
       )}
     </div>

@@ -13,7 +13,9 @@ const KEYS = {
   BANNED_EMAILS: 'sp_banned_list',
   USER_XP: 'sp_user_xp',
   USER_HISTORY: 'sp_user_doc_history',
-  SHEET_ROW_COUNT: 'sp_document_total_count'
+  SHEET_ROW_COUNT: 'sp_document_total_count',
+  IA_MEMORY: 'sp_ia_core_memory',
+  IA_STATS: 'sp_ia_performance_logs'
 };
 
 const parseCSV = (csv: string) => {
@@ -112,6 +114,36 @@ export const storageService = {
     return idMatch ? `https://drive.google.com/file/d/${idMatch[1]}/preview` : url;
   },
 
+  // IA MEMORY MANAGEMENT
+  getIAMemory: (): string => localStorage.getItem(KEYS.IA_MEMORY) || "Ton créateur est Astarté Léon. Tu es Polaris Brain.",
+  saveIAMemory: (memory: string) => localStorage.setItem(KEYS.IA_MEMORY, memory),
+
+  // IA PERFORMANCE STATS
+  logAIResponse: (modelName: string, timeTaken: number) => {
+    const stats = JSON.parse(localStorage.getItem(KEYS.IA_STATS) || '[]');
+    stats.push({ model: modelName, time: timeTaken, timestamp: Date.now() });
+    // Garder seulement les 500 derniers logs pour la performance
+    localStorage.setItem(KEYS.IA_STATS, JSON.stringify(stats.slice(-500)));
+  },
+  getAIStats: () => {
+    const logs = JSON.parse(localStorage.getItem(KEYS.IA_STATS) || '[]');
+    const summary: Record<string, { count: number, totalTime: number }> = {};
+    
+    logs.forEach((log: any) => {
+      if (!summary[log.model]) summary[log.model] = { count: 0, totalTime: 0 };
+      summary[log.model].count++;
+      summary[log.model].totalTime += log.time;
+    });
+
+    return Object.entries(summary)
+      .map(([name, data]) => ({
+        name,
+        count: data.count,
+        avgTime: Math.round(data.totalTime / data.count)
+      }))
+      .sort((a, b) => b.count - a.count);
+  },
+
   getUserXP: (): number => parseInt(localStorage.getItem(KEYS.USER_XP) || '0'),
   addXP: (amount: number): number => {
     const newXP = storageService.getUserXP() + amount;
@@ -182,7 +214,6 @@ export const storageService = {
     return JSON.parse(data);
   },
 
-  // Ajoute un nouveau compte administrateur dans le stockage local
   addAccount: (username: string, role: AdminAccount['role']): void => {
     const accounts = storageService.getAccounts();
     const newAccount: AdminAccount = {
@@ -194,7 +225,6 @@ export const storageService = {
     localStorage.setItem(KEYS.ACCOUNTS, JSON.stringify([...accounts, newAccount]));
   },
 
-  // Révoque un compte administrateur par son identifiant unique
   removeAccount: (id: string): void => {
     const accounts = storageService.getAccounts();
     const filtered = accounts.filter(a => a.id !== id);

@@ -3,192 +3,107 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SuccessPolaris - Majestueuse Voie du Savoir</title>
-    
-    <!-- SEO & Accessibilité IA -->
-    <meta name="description" content="SuccessPolaris : Le Palais Astral des archives scolaires. Accédez aux meilleurs PDF et cours pour réussir vos examens. Plateforme de révision futuriste par Astarté.">
-    <meta name="keywords" content="cours, PDF, révisions, examens, BAC 2025, succès, école, SuccessPolaris, archives scolaires">
-    <meta name="author" content="Astarté - Polaris Network">
-    <meta property="og:title" content="SuccessPolaris - Palais Astral du Savoir">
-    <meta property="og:description" content="Débloquez votre potentiel avec nos archives sécurisées.">
-    <meta property="og:type" content="website">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SuccessPolaris - Nexus Néon</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    animation: {
-                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                        'spin-slow': 'spin 12s linear infinite',
-                        'float': 'float 6s ease-in-out infinite',
-                    },
-                    keyframes: {
-                        float: {
-                            '0%, 100%': { transform: 'translateY(0)' },
-                            '50%': { transform: 'translateY(-15px)' },
-                        }
-                    }
-                }
-            }
-        }
-
-        // --- PROTOCOLES DE SÉCURITÉ NÉMÉSIS ---
-        document.addEventListener('contextmenu', e => e.preventDefault());
-        document.addEventListener('dragstart', e => e.preventDefault());
-        document.addEventListener('selectstart', e => {
-            if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') e.preventDefault();
-        });
-
-        window.addEventListener('keydown', function(e) {
-            if (
-                e.keyCode === 123 || 
-                (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) || 
-                (e.ctrlKey && e.keyCode === 85) || 
-                (e.ctrlKey && e.keyCode === 83) || 
-                (e.metaKey && e.altKey && e.keyCode === 73)
-            ) {
-                e.preventDefault();
-                return false;
-            }
-        });
-
-        (function() {
-            const block = () => {
-                const start = performance.now();
-                debugger;
-                const end = performance.now();
-                if (end - start > 50) {
-                    document.body.innerHTML = `
-                        <div style="background:#020617;color:#00d4ff;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:sans-serif;text-align:center;padding:40px;">
-                            <h1 style="font-size:50px;font-weight:900;margin-bottom:20px;">INTRUSION DÉTECTÉE</h1>
-                            <p style="font-size:14px;letter-spacing:0.2em;color:rgba(255,255,255,0.4);">VOTRE ACCÈS À LA MATRICE POLARIS A ÉTÉ RÉVOQUÉ DÉFINITIVEMENT.</p>
-                            <div style="margin-top:40px;width:100px;height:2px;background:#00d4ff;box-shadow:0 0 20px #00d4ff;"></div>
-                        </div>
-                    `;
-                    throw "Accès Interdit";
-                }
-            };
-            setInterval(() => {
-                console.clear();
-                console.log("%cACCÈS RÉSERVÉ À NÉMÉSIS", "color: #00d4ff; font-size: 30px; font-weight: bold;");
-            }, 100);
-            setInterval(block, 500);
-        })();
-
-        const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                if (mutation.removedNodes.length) {
-                    mutation.removedNodes.forEach(node => {
-                        if (node.tagName === 'SCRIPT') window.location.reload();
-                    });
-                }
-            });
-        });
-        observer.observe(document.documentElement, { childList: true, subtree: true });
-    </script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
             background-color: #020617;
-            color: #f8fafc;
+            color: #e2e8f0;
             margin: 0;
             overflow-x: hidden;
-            user-select: none !important;
-            -webkit-user-select: none !important;
-            -webkit-touch-callout: none !important;
         }
-        input, textarea {
-            user-select: auto !important;
-            -webkit-user-select: auto !important;
-        }
-        #root { min-height: 100vh; }
+        #root { min-height: 100vh; position: relative; z-index: 10; }
+        
         #loader {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: #020617;
+            inset: 0;
+            background: #000;
+            z-index: 99999;
             display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-            transition: opacity 0.8s ease-in-out;
-        }
-        .loader-content { text-align: center; width: 80%; max-width: 400px; }
-        .polaris-logo {
-            font-size: 3.5rem;
-            color: #00d4ff;
-            margin-bottom: 1.5rem;
-            display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 15px;
+            transition: opacity 1.5s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        .polaris-logo span { font-weight: 900; color: #fff; letter-spacing: -2px; }
-        #loader h1 {
-            color: #fff;
-            font-size: 0.8rem;
-            letter-spacing: 0.6em;
-            font-weight: 900;
-            margin-bottom: 2.5rem;
-            text-transform: uppercase;
-        }
-        .loading-bar {
-            width: 100%;
-            height: 2px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 10px;
-            overflow: hidden;
+
+        .stellar-phenomenon {
             position: relative;
+            width: 250px;
+            height: 250px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        .loading-progress {
-            width: 40%;
-            height: 100%;
+
+        .stellar-core {
+            width: 60px;
+            height: 60px;
             background: #00d4ff;
-            box-shadow: 0 0 20px #00d4ff;
+            border-radius: 50%;
+            box-shadow: 
+                0 0 30px #00d4ff,
+                0 0 60px rgba(0, 212, 255, 0.5),
+                inset 0 0 15px #fff;
+            animation: core-pulse 1.5s ease-in-out infinite;
+            z-index: 10;
+        }
+
+        .stellar-ring {
             position: absolute;
-            animation: loading-anim 2s infinite ease-in-out;
+            border-radius: 50%;
+            border: 1px solid rgba(0, 212, 255, 0.2);
         }
-        @keyframes loading-anim {
-            0% { left: -40%; }
-            100% { left: 140%; }
+
+        .ring-1 { width: 120px; height: 120px; animation: rotate-linear 4s linear infinite; border-top-color: #00d4ff; }
+        .ring-2 { width: 180px; height: 180px; animation: rotate-reverse 8s linear infinite; border-right-color: #3b82f6; }
+        .ring-3 { width: 240px; height: 240px; animation: rotate-linear 12s linear infinite; border-bottom-color: #00d4ff; border-style: dashed; }
+
+        .loader-title {
+            margin-top: 4rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 1.5em;
+            color: #fff;
+            font-size: 18px;
+            text-shadow: 0 0 20px #00d4ff;
         }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .shadow-neon { box-shadow: 0 0 20px rgba(0, 212, 255, 0.3); }
-        .drop-shadow-neon { filter: drop-shadow(0 0 8px rgba(0, 212, 255, 0.6)); }
+
+        @keyframes core-pulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 30px #00d4ff; }
+            50% { transform: scale(1.1); box-shadow: 0 0 50px #00d4ff; }
+        }
+        @keyframes rotate-linear { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes rotate-reverse { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
     </style>
     <script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@19.0.0",
-    "react-dom": "https://esm.sh/react-dom@19.0.0",
-    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.35.0"
-  }
-}
-</script>
+    {
+      "imports": {
+        "react": "https://esm.sh/react@19.0.0",
+        "react-dom": "https://esm.sh/react-dom@19.0.0",
+        "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+        "@google/genai": "https://esm.sh/@google/genai@^1.35.0",
+        "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+        "react/": "https://esm.sh/react@^19.2.4/"
+      }
+    }
+    </script>
     <script type="module" src="index.tsx"></script>
 </head>
 <body>
     <div id="loader">
-        <div class="loader-content">
-            <div class="polaris-logo">
-                <i class="fas fa-star animate-pulse"></i>
-                <span>P</span>
-            </div>
-            <h1>INITIALISATION NEXUS...</h1>
-            <div class="loading-bar">
-                <div class="loading-progress"></div>
-            </div>
+        <div class="stellar-phenomenon">
+            <div class="stellar-ring ring-1"></div>
+            <div class="stellar-ring ring-2"></div>
+            <div class="stellar-ring ring-3"></div>
+            <div class="stellar-core"></div>
         </div>
+        <div class="loader-title">SUCCESS POLARIS</div>
+        <div style="font-size: 8px; color: #00d4ff; margin-top: 1.5rem; letter-spacing: 0.5em; font-weight: 800; text-transform: uppercase; opacity: 0.4;">Initialisation du Nexus</div>
     </div>
     <div id="root"></div>
 </body>
