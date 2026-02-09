@@ -14,9 +14,12 @@ const KEYS = {
   USER_XP: 'sp_user_xp',
   USER_HISTORY: 'sp_user_doc_history',
   SHEET_ROW_COUNT: 'sp_document_total_count',
-  IA_MEMORY: 'sp_ia_core_memory',
+  IA_DIRECTIVES: 'sp_ia_directives',
+  IA_NOTES: 'sp_ia_notes',
   IA_STATS: 'sp_ia_performance_logs',
-  IA_HEALTH: 'sp_ia_provider_health'
+  IA_HEALTH: 'sp_ia_provider_health',
+  QUERY_ANALYSIS: 'sp_query_analysis_logs',
+  IA_ERROR_LOGS: 'sp_ia_critical_errors'
 };
 
 const parseCSV = (csv: string) => {
@@ -115,47 +118,67 @@ export const storageService = {
     return idMatch ? `https://drive.google.com/file/d/${idMatch[1]}/preview` : url;
   },
 
-  getIAMemory: (): string => localStorage.getItem(KEYS.IA_MEMORY) || "Ton créateur est Astarté Léon. Tu es Polaris Brain.",
-  saveIAMemory: (memory: string) => localStorage.setItem(KEYS.IA_MEMORY, memory),
+  getIADirectives: (): string => localStorage.getItem(KEYS.IA_DIRECTIVES) || "Ton créateur est Astarté Léon. Sois poli, futuriste et motivant.",
+  saveIADirectives: (text: string) => localStorage.setItem(KEYS.IA_DIRECTIVES, text),
+  
+  getIANotes: (): string => localStorage.getItem(KEYS.IA_NOTES) || "",
+  saveIANotes: (text: string) => localStorage.setItem(KEYS.IA_NOTES, text),
+
+  logQueryForAnalysis: (email: string | null, query: string, response: string) => {
+    const analysis = JSON.parse(localStorage.getItem(KEYS.QUERY_ANALYSIS) || '[]');
+    analysis.push({
+      id: Date.now(),
+      email: email || 'Anonyme',
+      query,
+      responseSummary: response.substring(0, 100) + '...',
+      timestamp: new Date().toLocaleString()
+    });
+    localStorage.setItem(KEYS.QUERY_ANALYSIS, JSON.stringify(analysis.slice(-200)));
+  },
+
+  getQueryAnalysis: () => JSON.parse(localStorage.getItem(KEYS.QUERY_ANALYSIS) || '[]'),
 
   logAIResponse: (modelName: string, timeTaken: number) => {
     const stats = JSON.parse(localStorage.getItem(KEYS.IA_STATS) || '[]');
     stats.push({ model: modelName, time: timeTaken, timestamp: Date.now() });
     localStorage.setItem(KEYS.IA_STATS, JSON.stringify(stats.slice(-500)));
     
-    // Marquer comme opérationnel
     const health = JSON.parse(localStorage.getItem(KEYS.IA_HEALTH) || '{}');
-    health[modelName] = { status: 'online', lastUpdate: Date.now() };
+    health[modelName] = { status: 'online', lastUpdate: Date.now(), error: null };
     localStorage.setItem(KEYS.IA_HEALTH, JSON.stringify(health));
   },
 
-  logAIError: (modelName: string) => {
+  logAIError: (modelName: string, errorMsg: string) => {
     const health = JSON.parse(localStorage.getItem(KEYS.IA_HEALTH) || '{}');
-    health[modelName] = { status: 'offline', lastUpdate: Date.now() };
+    health[modelName] = { status: 'offline', lastUpdate: Date.now(), error: errorMsg };
     localStorage.setItem(KEYS.IA_HEALTH, JSON.stringify(health));
-    storageService.addLog('SYSTEM', `Erreur critique sur le fournisseur IA : ${modelName}`);
+    
+    const errors = JSON.parse(localStorage.getItem(KEYS.IA_ERROR_LOGS) || '[]');
+    errors.push({ id: Date.now(), model: modelName, error: errorMsg, timestamp: new Date().toLocaleString() });
+    localStorage.setItem(KEYS.IA_ERROR_LOGS, JSON.stringify(errors.slice(-50)));
+    
+    storageService.addLog('SYSTEM', `Échec Nexus ${modelName}: ${errorMsg.substring(0, 50)}`);
   },
 
   getAIHealth: () => JSON.parse(localStorage.getItem(KEYS.IA_HEALTH) || '{}'),
+  getAICriticalErrors: () => JSON.parse(localStorage.getItem(KEYS.IA_ERROR_LOGS) || '[]'),
 
   getAIStats: () => {
     const logs = JSON.parse(localStorage.getItem(KEYS.IA_STATS) || '[]');
     const summary: Record<string, { count: number, totalTime: number }> = {};
-    
     logs.forEach((log: any) => {
       if (!summary[log.model]) summary[log.model] = { count: 0, totalTime: 0 };
       summary[log.model].count++;
       summary[log.model].totalTime += log.time;
     });
-
     const health = storageService.getAIHealth();
-
     return Object.entries(summary)
       .map(([name, data]) => ({
         name,
         count: data.count,
         avgTime: Math.round(data.totalTime / data.count),
-        status: health[name]?.status || 'unknown'
+        status: health[name]?.status || 'unknown',
+        lastError: health[name]?.error || null
       }))
       .sort((a, b) => b.count - a.count);
   },
@@ -171,8 +194,7 @@ export const storageService = {
   getBannedEmails: (): string[] => JSON.parse(localStorage.getItem(KEYS.BANNED_EMAILS) || '[]'),
   isEmailBanned: (email: string): boolean => {
     const userEmail = storageService.getUserEmail();
-    const isBanned = storageService.getBannedEmails().includes(email);
-    return isBanned || (userEmail ? storageService.getBannedEmails().includes(userEmail) : false);
+    return storageService.getBannedEmails().includes(email) || (userEmail ? storageService.getBannedEmails().includes(userEmail) : false);
   },
   banEmail: (email: string): void => {
     const banned = storageService.getBannedEmails();
@@ -183,8 +205,7 @@ export const storageService = {
   },
   unbanEmail: (email: string): void => {
     const banned = storageService.getBannedEmails();
-    const filtered = banned.filter(e => e !== email);
-    localStorage.setItem(KEYS.BANNED_EMAILS, JSON.stringify(filtered));
+    localStorage.setItem(KEYS.BANNED_EMAILS, JSON.stringify(banned.filter(e => e !== email)));
     storageService.addLog('BAN', `Accès rétabli : ${email}`);
   },
   getAccounts: (): AdminAccount[] => {
@@ -198,13 +219,10 @@ export const storageService = {
   },
   addAccount: (username: string, role: AdminAccount['role']): void => {
     const accounts = storageService.getAccounts();
-    const newAccount: AdminAccount = { id: Date.now().toString(), username, role, lastLogin: '' };
-    localStorage.setItem(KEYS.ACCOUNTS, JSON.stringify([...accounts, newAccount]));
+    localStorage.setItem(KEYS.ACCOUNTS, JSON.stringify([...accounts, { id: Date.now().toString(), username, role, lastLogin: '' }]));
   },
   removeAccount: (id: string): void => {
-    const accounts = storageService.getAccounts();
-    const filtered = accounts.filter(a => a.id !== id);
-    localStorage.setItem(KEYS.ACCOUNTS, JSON.stringify(filtered));
+    localStorage.setItem(KEYS.ACCOUNTS, JSON.stringify(storageService.getAccounts().filter(a => a.id !== id)));
   },
   getVisitorActivities: () => JSON.parse(localStorage.getItem(KEYS.VISITOR_ACTIVITY) || '[]'),
   getAdvancedStats: () => {
@@ -228,24 +246,19 @@ export const storageService = {
   getLogs: () => JSON.parse(localStorage.getItem(KEYS.LOGS) || '[]'),
   addLog: (action: any, details: string) => {
     const logs = JSON.parse(localStorage.getItem(KEYS.LOGS) || '[]');
-    const newLog = { id: Date.now().toString(), action, details, timestamp: new Date().toLocaleString() };
-    localStorage.setItem(KEYS.LOGS, JSON.stringify([newLog, ...logs].slice(0, 100)));
+    localStorage.setItem(KEYS.LOGS, JSON.stringify([{ id: Date.now().toString(), action, details, timestamp: new Date().toLocaleString() }, ...logs].slice(0, 100)));
   },
   logVisit: (): void => {
-    const email = storageService.getUserEmail();
     const activities = JSON.parse(localStorage.getItem(KEYS.VISITOR_ACTIVITY) || '[]');
-    const newAct = { id: `v-${Date.now()}`, type: 'VISIT', email: email || 'Anonyme', timestamp: new Date().toLocaleString() };
-    localStorage.setItem(KEYS.VISITOR_ACTIVITY, JSON.stringify([newAct, ...activities].slice(0, 500)));
+    localStorage.setItem(KEYS.VISITOR_ACTIVITY, JSON.stringify([{ id: `v-${Date.now()}`, type: 'VISIT', email: storageService.getUserEmail() || 'Anonyme', timestamp: new Date().toLocaleString() }, ...activities].slice(0, 500)));
   },
   logPreview: (email: string | null, fileName: string) => {
     const activities = JSON.parse(localStorage.getItem(KEYS.VISITOR_ACTIVITY) || '[]');
-    const newAct = { id: `p-${Date.now()}`, type: 'PREVIEW', email: email || 'Anonyme', fileName, timestamp: new Date().toLocaleString() };
-    localStorage.setItem(KEYS.VISITOR_ACTIVITY, JSON.stringify([newAct, ...activities].slice(0, 500)));
+    localStorage.setItem(KEYS.VISITOR_ACTIVITY, JSON.stringify([{ id: `p-${Date.now()}`, type: 'PREVIEW', email: email || 'Anonyme', fileName, timestamp: new Date().toLocaleString() }, ...activities].slice(0, 500)));
   },
   logDownload: (email: string, fileName: string, docId?: string) => {
     const activities = JSON.parse(localStorage.getItem(KEYS.VISITOR_ACTIVITY) || '[]');
-    const newAct = { id: `d-${Date.now()}`, type: 'DOWNLOAD', email, fileName, timestamp: new Date().toLocaleString() };
-    localStorage.setItem(KEYS.VISITOR_ACTIVITY, JSON.stringify([newAct, ...activities].slice(0, 500)));
+    localStorage.setItem(KEYS.VISITOR_ACTIVITY, JSON.stringify([{ id: `d-${Date.now()}`, type: 'DOWNLOAD', email, fileName, timestamp: new Date().toLocaleString() }, ...activities].slice(0, 500)));
     if (docId) {
       const history = JSON.parse(localStorage.getItem(KEYS.USER_HISTORY) || '[]');
       if (!history.includes(docId)) localStorage.setItem(KEYS.USER_HISTORY, JSON.stringify([...history, docId]));

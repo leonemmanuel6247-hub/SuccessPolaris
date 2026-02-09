@@ -14,7 +14,8 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [lastError, setLastError] = useState<boolean>(false);
+  const [activeSource, setActiveSource] = useState<string | null>(null);
+  const [diagInfo, setDiagInfo] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -25,50 +26,37 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
     if (isOpen) scrollToBottom();
   }, [messages, isTyping, isOpen]);
 
-  const renderFormattedText = (text: string) => {
-    let formatted = text
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/__(.*?)__/g, '<u>$1</u>')
-      .replace(/\n/g, '<br/>');
-    
-    return <div dangerouslySetInnerHTML={{ __html: formatted }} />;
-  };
-
-  const handleSendMessage = async (e?: React.FormEvent, retryText?: string) => {
+  const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const textToSend = retryText || inputValue;
-    if (!textToSend.trim() || isTyping) return;
+    const query = inputValue.trim();
+    if (!query || isTyping) return;
 
-    setLastError(false);
-    if (!retryText) {
-      const userMessage: ChatMessage = {
-        role: 'user',
-        text: textToSend,
-        timestamp: new Date().toLocaleTimeString()
-      };
-      setMessages(prev => [...prev, userMessage]);
-      setInputValue('');
-    }
+    setInputValue('');
+    setDiagInfo(null);
+    setActiveSource(null);
+    
+    setMessages(prev => [...prev, {
+      role: 'user',
+      text: query,
+      timestamp: new Date().toLocaleTimeString()
+    }]);
     
     setIsTyping(true);
 
     try {
-      const currentMessages = retryText ? messages : [...messages, { role: 'user', text: textToSend, timestamp: '' } as ChatMessage];
-      const response: AIProviderResponse = await aiService.processMessage(currentMessages, documents);
-      
-      if (response.text) {
-        setMessages(prev => [...prev, {
-          role: 'model',
-          text: response.text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim(),
-          timestamp: new Date().toLocaleTimeString()
-        }]);
-      }
-    } catch (error) {
-      setLastError(true);
+      const response: AIProviderResponse = await aiService.processMessage([...messages, { role: 'user', text: query, timestamp: '' }], documents);
+      setActiveSource(response.source);
       setMessages(prev => [...prev, {
         role: 'model',
-        text: "Désolé, une instabilité temporaire dans le Nexus m'empêche de répondre. Veux-tu réessayer ?",
+        text: response.text,
+        timestamp: new Date().toLocaleTimeString()
+      }]);
+    } catch (error: any) {
+      const technicalError = error.message || "UNKNOWN_SYNC_ERROR";
+      setDiagInfo(`PROTOCOLE_INTERROMPU : ${technicalError}`);
+      setMessages(prev => [...prev, {
+        role: 'model',
+        text: "Désolé, le Nexus rencontre une instabilité majeure hors de son périmètre d'origine. Veuillez vérifier la configuration de vos clés API dans le dashboard de l'hébergeur.",
         timestamp: new Date().toLocaleTimeString()
       }]);
     } finally {
@@ -78,107 +66,92 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
 
   return (
     <>
-      <div className="fixed bottom-6 right-6 z-[7000] flex flex-col items-end">
-        <button onClick={() => setIsOpen(!isOpen)} className="group relative">
-          <div className="absolute inset-0 bg-cyan-500/20 blur-xl rounded-full scale-110 opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-          <div className={`relative bg-slate-950/80 backdrop-blur-3xl border ${isOpen ? 'border-cyan-400' : 'border-white/10'} px-5 py-3 rounded-[1.5rem] shadow-2xl flex items-center gap-4 transition-all duration-500`}>
-             <div className="w-10 h-10 bg-cyan-500/10 border border-cyan-400/30 rounded-xl flex items-center justify-center shadow-neon">
-                <i className="fas fa-brain text-cyan-400 text-sm animate-pulse"></i>
-             </div>
-             <div className="flex flex-col items-start text-left">
-                <span className="text-[8px] font-black uppercase text-cyan-400/60 tracking-widest leading-none">Polaris Brain</span>
-                <span className="text-[14px] font-black text-white">Assistant Virtuel</span>
-             </div>
+      <div className="fixed bottom-6 right-6 z-[7000]">
+        <button 
+          onClick={() => setIsOpen(!isOpen)} 
+          className="relative group bg-slate-950/80 backdrop-blur-3xl border border-cyan-500/30 px-6 py-4 rounded-[2rem] shadow-2xl flex items-center gap-4 hover:border-cyan-400 transition-all duration-500"
+        >
+          <div className="absolute inset-0 bg-cyan-400/5 blur-xl rounded-full group-hover:bg-cyan-400/10 transition-all"></div>
+          <div className={`w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-400/30 flex items-center justify-center ${isTyping ? 'animate-pulse' : ''}`}>
+             <i className="fas fa-brain text-cyan-400 text-sm"></i>
+          </div>
+          <div className="text-left">
+             <p className="text-[8px] font-black uppercase text-cyan-400/60 tracking-widest">IA Polaris</p>
+             <p className="text-[13px] font-black text-white">Brain v3.1</p>
           </div>
         </button>
       </div>
 
       {isOpen && (
-        <div className="fixed bottom-0 right-0 w-full sm:bottom-6 sm:right-6 sm:w-[380px] h-[100dvh] sm:h-[550px] max-h-[100dvh] sm:max-h-[85vh] z-[8000] bg-slate-950 sm:bg-slate-950/90 backdrop-blur-3xl border-t sm:border border-white/10 sm:rounded-[2.5rem] shadow-[0_20px_60px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden animate-in slide-in-from-bottom-20 duration-500">
-          
-          <div className="bg-slate-900/50 p-6 border-b border-white/5 flex items-center justify-between">
+        <div className="fixed bottom-0 right-0 w-full sm:bottom-6 sm:right-6 sm:w-[420px] h-[100dvh] sm:h-[650px] z-[8000] bg-slate-950/98 backdrop-blur-3xl border-t sm:border border-white/10 sm:rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 duration-500">
+          <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
             <div className="flex items-center gap-4">
-              <div className="w-10 h-10 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center">
-                <i className="fas fa-graduation-cap text-cyan-400 text-sm"></i>
+              <div className="w-10 h-10 bg-cyan-500/10 rounded-xl flex items-center justify-center">
+                <i className="fas fa-satellite text-cyan-400 text-xs"></i>
               </div>
               <div>
-                <h3 className="text-white font-black uppercase text-[12px] tracking-widest">Polaris Brain</h3>
-                <p className="text-[7px] text-white/30 font-black uppercase tracking-[0.3em]">IA Core Alpha</p>
+                <h3 className="text-[12px] font-black text-white uppercase tracking-widest italic">Polaris Brain</h3>
+                <div className="flex items-center gap-2">
+                   <div className={`w-1.5 h-1.5 rounded-full ${diagInfo ? 'bg-red-500' : 'bg-emerald-500'} animate-pulse`}></div>
+                   <span className="text-[7px] text-white/30 uppercase font-black truncate max-w-[150px]">{diagInfo || 'Liaison Stable'}</span>
+                </div>
               </div>
             </div>
-            <button onClick={() => setIsOpen(false)} className="text-white/20 hover:text-white transition-colors p-2">
-              <i className="fas fa-times text-xl"></i>
+            <button onClick={() => setIsOpen(false)} className="text-white/20 hover:text-white p-2">
+              <i className="fas fa-times"></i>
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 scroll-smooth custom-scrollbar">
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
             {messages.length === 0 && (
-              <div className="h-full flex flex-col items-center justify-center text-center space-y-4 px-4">
-                <p className="text-[11px] text-white/50 font-medium leading-relaxed uppercase tracking-wider">
-                  Bonjour ! Je suis ton assistant **Polaris Brain**.<br/>Mes senseurs sont actifs. Comment puis-je t'aider ?
-                </p>
+              <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-30">
+                 <i className="fas fa-atom text-4xl text-cyan-400 animate-spin-slow"></i>
+                 <p className="text-[9px] font-black text-white uppercase tracking-[0.3em]">Synchro du Nexus en cours...</p>
               </div>
             )}
-
-            {messages.map((msg, idx) => (
-              <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-2`}>
-                <div className={`max-w-[90%] p-4 rounded-[1.5rem] text-[12px] leading-relaxed shadow-lg break-words ${
-                  msg.role === 'user' 
-                  ? 'bg-cyan-500 text-slate-950 font-bold rounded-tr-none' 
-                  : 'bg-white/5 border border-white/10 text-white/90 rounded-tl-none'
+            {messages.map((m, i) => (
+              <div key={i} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
+                <div className={`max-w-[85%] p-5 rounded-[1.8rem] text-[12.5px] leading-relaxed ${
+                  m.role === 'user' ? 'bg-cyan-500 text-black font-bold rounded-tr-none' : 'bg-white/5 border border-white/10 text-white rounded-tl-none shadow-xl'
                 }`}>
-                  {renderFormattedText(msg.text)}
-                  {idx === messages.length - 1 && lastError && msg.role === 'model' && (
-                    <button 
-                      onClick={() => handleSendMessage(undefined, messages[messages.length-2]?.text)}
-                      className="mt-3 block w-full py-2 bg-cyan-400/10 border border-cyan-400/30 rounded-xl text-cyan-400 text-[9px] font-black uppercase tracking-widest hover:bg-cyan-400/20 transition-all"
-                    >
-                      <i className="fas fa-redo mr-2"></i> Relancer le Flux
-                    </button>
-                  )}
+                   {m.text}
+                   {m.role === 'model' && i === messages.length - 1 && activeSource && (
+                     <p className="mt-4 pt-4 border-t border-white/5 text-[7px] text-cyan-400/40 uppercase font-black italic tracking-widest">{activeSource}</p>
+                   )}
                 </div>
-                <span className="text-[7px] text-white/20 font-bold mt-1 px-2">{msg.timestamp}</span>
+                <span className="text-[7px] text-white/20 font-black mt-2 px-4 uppercase tracking-widest">{m.timestamp}</span>
               </div>
             ))}
-
             {isTyping && (
-              <div className="flex items-center gap-3">
-                <div className="flex gap-1">
-                  <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce"></div>
-                  <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{animationDelay:'150ms'}}></div>
-                  <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{animationDelay:'300ms'}}></div>
-                </div>
-                <span className="text-[7px] text-white/20 uppercase font-black tracking-widest italic">Synchronisation...</span>
+              <div className="flex items-center gap-3 animate-pulse px-4">
+                 <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce"></div>
+                 <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce delay-100"></div>
+                 <span className="text-[8px] text-cyan-400/60 uppercase font-black tracking-widest italic">Analyse du Flux...</span>
               </div>
             )}
             <div ref={messagesEndRef} />
           </div>
 
-          <form onSubmit={handleSendMessage} className="p-4 sm:p-6 bg-black/40 border-t border-white/5">
-            <div className="flex items-center bg-white/5 border border-white/10 rounded-2xl p-1.5 focus-within:border-cyan-500/50 transition-all">
-              <input 
-                type="text" 
-                value={inputValue}
-                onChange={e => setInputValue(e.target.value)}
-                placeholder="Pose ta question ici..." 
-                className="flex-1 bg-transparent px-4 py-3 text-[12px] font-medium text-white outline-none"
-              />
-              <button 
-                type="submit"
-                disabled={!inputValue.trim() || isTyping}
-                className="w-10 h-10 bg-cyan-500 text-slate-950 rounded-xl flex items-center justify-center disabled:opacity-30 transition-all hover:scale-105 active:scale-95 shadow-neon"
-              >
-                <i className="fas fa-arrow-up text-xs"></i>
-              </button>
+          <form onSubmit={handleSendMessage} className="p-6 bg-black/40 border-t border-white/5 backdrop-blur-xl">
+            <div className="flex items-center bg-white/5 border border-white/10 rounded-2xl p-2 focus-within:border-cyan-500/50 transition-all shadow-inner">
+               <input 
+                 value={inputValue}
+                 onChange={e => setInputValue(e.target.value)}
+                 className="flex-1 bg-transparent px-4 py-3 text-[13px] text-white outline-none placeholder-white/10 font-medium"
+                 placeholder="Interroger Polaris Brain..."
+               />
+               <button type="submit" disabled={!inputValue.trim() || isTyping} className="w-11 h-11 bg-cyan-500 text-black rounded-xl flex items-center justify-center shadow-neon hover:scale-105 active:scale-90 transition-all disabled:opacity-20">
+                  <i className="fas fa-bolt-lightning text-xs"></i>
+               </button>
             </div>
           </form>
         </div>
       )}
       <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .animate-spin-slow { animation: spin 10s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .custom-scrollbar::-webkit-scrollbar { width: 3px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(0, 212, 255, 0.1); border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(0, 212, 255, 0.3); }
       `}</style>
     </>
   );
