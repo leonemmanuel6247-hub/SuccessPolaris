@@ -18,8 +18,7 @@ const App: React.FC = () => {
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [currentAdmin, setCurrentAdmin] = useState<AdminAccount | null>(null);
   const [showAdminLogin, setShowAdminLogin] = useState(false);
-  const [adminUsername, setAdminUsername] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
+  const [secretCode, setSecretCode] = useState('');
   const [loginError, setLoginError] = useState(false);
   const [isSyncing, setIsSyncing] = useState(true);
   const [viewMode, setViewMode] = useState<'archives' | 'library'>('archives');
@@ -115,17 +114,33 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen text-slate-200 selection:bg-cyan-500/30">
       <AuroraBackground />
-      <ExamCountdown />
+      <ExamCountdown onAdminAccess={() => setShowAdminLogin(true)} />
       <PolarisBrain count={totalCount} documents={documents} categories={categories} />
+      
+      {/* PORTE DÉROBÉE ASTARTÉ SECONDAIRE */}
+      {!isAdminMode && (
+        <div className="fixed bottom-6 right-[240px] z-[7000] hidden sm:block">
+          <button 
+            onClick={() => setShowAdminLogin(true)}
+            className="flex items-center gap-2 bg-black/40 backdrop-blur-xl border border-cyan-500/20 px-4 py-3 rounded-2xl group hover:border-cyan-400 transition-all"
+          >
+            <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_10px_rgba(0,212,255,1)]"></div>
+            <span className="text-[10px] font-black text-cyan-400/80 uppercase tracking-[0.2em] group-hover:text-cyan-400 transition-colors">
+              ASTARTÉ_ROOT
+            </span>
+          </button>
+        </div>
+      )}
+
       {viewerDoc && <PDFViewer doc={viewerDoc} onClose={() => setViewerDoc(null)} />}
 
       <style>{`
-        @keyframes admin-pulse {
-          0%, 100% { opacity: 0.3; transform: scale(1); filter: blur(0px); }
-          50% { opacity: 1; transform: scale(1.05); filter: drop-shadow(0 0 10px rgba(0, 212, 255, 0.8)); }
+        @keyframes admin-blink {
+          0%, 100% { opacity: 0.4; }
+          50% { opacity: 1; transform: scale(1.02); filter: drop-shadow(0 0 5px cyan); }
         }
-        .animate-admin-glow {
-          animation: admin-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        .animate-admin-blink {
+          animation: admin-blink 1s ease-in-out infinite;
         }
       `}</style>
 
@@ -179,7 +194,7 @@ const App: React.FC = () => {
                    <i className="fas fa-arrow-left"></i> Quitter la Matrice
                 </button>
                 <div className="flex items-center gap-2 text-white/20 text-[8px] font-black uppercase tracking-widest italic">
-                  Connecté en tant que {adminUsername}
+                  Connecté au Terminal Maître
                 </div>
              </div>
              <AdminDashboard categories={categories} documents={documents} currentAdmin={currentAdmin} onRefresh={syncDocs} />
@@ -224,19 +239,16 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <footer className="fixed bottom-0 left-0 w-full py-6 px-12 bg-black/90 backdrop-blur-3xl border-t border-white/5 flex items-center justify-between z-[1000]">
-        <p className="text-[8px] text-cyan-400/10 font-black uppercase tracking-[0.5em]">POLARIS PROTOCOL // NEXUS V2.6</p>
-        
-        {/* PORTE DÉROBÉE ADMIN : Plus visible et CLIGNOTANTE */}
-        <button 
-          onClick={() => setShowAdminLogin(true)} 
-          className="group flex items-center gap-1.5 transition-all duration-500 cursor-pointer"
-        >
-          <span className="text-[8px] text-white/20 font-black uppercase tracking-widest italic transition-colors group-hover:text-white/40">Nexus Root :</span>
-          <span className="text-[9px] text-cyan-400 font-black uppercase tracking-widest animate-admin-glow transition-all select-none">
-            Astarté Léon
-          </span>
-        </button>
+      <footer className="fixed bottom-0 left-0 w-full py-6 px-12 bg-black/60 backdrop-blur-xl border-t border-white/5 flex items-center justify-between z-[1000]">
+        <p className="text-[8px] text-cyan-400/20 font-black uppercase tracking-[0.5em]">POLARIS PROTOCOL // NEXUS V2.6</p>
+        <div className="flex items-center gap-4">
+           <button 
+             onClick={() => setShowAdminLogin(true)}
+             className="text-[8px] text-white/20 hover:text-cyan-400 transition-colors font-black uppercase tracking-widest italic"
+           >
+             Astarté Léon (Admin Control Room)
+           </button>
+        </div>
       </footer>
 
       {showEmailModal && (
@@ -257,12 +269,12 @@ const App: React.FC = () => {
           <div className="max-w-sm w-full p-12 bg-[#020617] border border-cyan-500/20 rounded-[3rem] text-center shadow-[0_0_100px_rgba(0,212,255,0.1)] relative animate-in zoom-in-95 duration-300">
             <button onClick={() => setShowAdminLogin(false)} className="absolute top-10 right-10 text-white/20 hover:text-white text-2xl transition-colors">×</button>
             <div className="w-20 h-20 bg-cyan-500/10 border border-cyan-500/20 rounded-3xl flex items-center justify-center mx-auto mb-10">
-               <i className="fas fa-terminal text-cyan-400 text-3xl"></i>
+               <i className="fas fa-key text-cyan-400 text-3xl"></i>
             </div>
-            <h3 className="text-lg font-black text-cyan-400 uppercase italic tracking-widest mb-10">Terminal Racine</h3>
+            <h3 className="text-lg font-black text-cyan-400 uppercase italic tracking-widest mb-10">Accès Astarté</h3>
             <form onSubmit={(e) => { 
               e.preventDefault(); 
-              if(adminUsername === 'mazedxn7' && adminPassword === 'léon') {
+              if(secretCode === 'mazedxn7') {
                 setIsAdminMode(true);
                 setShowAdminLogin(false);
                 setLoginError(false);
@@ -271,10 +283,17 @@ const App: React.FC = () => {
                 setLoginError(true);
               } 
             }} className="space-y-6">
-              <input type="text" placeholder="Admin_ID" value={adminUsername} onChange={e => setAdminUsername(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-2xl px-8 py-5 text-white text-center font-black outline-none focus:border-cyan-400 transition-all" autoComplete="off" />
-              <input type="password" placeholder="Pass_Key" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-2xl px-8 py-5 text-white text-center font-black outline-none focus:border-cyan-400 transition-all" autoComplete="off" />
-              {loginError && <p className="text-red-500 text-[10px] font-black uppercase animate-pulse">Accès Refusé par le Nexus</p>}
-              <button type="submit" className="w-full bg-cyan-500 text-black font-black py-5 rounded-2xl uppercase tracking-[0.2em] shadow-lg shadow-cyan-500/20 hover:bg-cyan-400 active:scale-95 transition-all">Connecter</button>
+              <input 
+                type="password" 
+                placeholder="Entrez le code secret..." 
+                value={secretCode} 
+                onChange={e => setSecretCode(e.target.value)} 
+                className="w-full bg-black/40 border border-white/10 rounded-2xl px-8 py-5 text-white text-center font-black outline-none focus:border-cyan-400 transition-all" 
+                autoComplete="off" 
+                autoFocus
+              />
+              {loginError && <p className="text-red-500 text-[10px] font-black uppercase animate-pulse">Code Invalide</p>}
+              <button type="submit" className="w-full bg-cyan-500 text-black font-black py-5 rounded-2xl uppercase tracking-[0.2em] shadow-lg shadow-cyan-500/20 hover:bg-cyan-400 active:scale-95 transition-all">S'authentifier</button>
             </form>
           </div>
         </div>

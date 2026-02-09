@@ -1,7 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 
-const ExamCountdown: React.FC = () => {
+interface ExamCountdownProps {
+  onAdminAccess?: () => void;
+}
+
+const ExamCountdown: React.FC<ExamCountdownProps> = ({ onAdminAccess }) => {
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const targetDate = new Date('2025-06-16T08:00:00'); 
 
@@ -18,7 +22,12 @@ const ExamCountdown: React.FC = () => {
 
   return (
     <div className="fixed top-0 left-1/2 -translate-x-1/2 z-[100] bg-black/40 backdrop-blur-md px-8 py-2 rounded-b-3xl border-x border-b border-white/10 shadow-[0_10px_30px_rgba(255,255,255,0.05)]">
-      <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20 mb-1 text-center">Protocoles Terminaux</p>
+      <button 
+        onClick={onAdminAccess}
+        className="block w-full text-[10px] font-black uppercase tracking-[0.4em] text-cyan-400/40 hover:text-cyan-400 transition-colors mb-1 text-center cursor-pointer"
+      >
+        Astarté
+      </button>
       <div className="flex items-center gap-3">
         <span className="text-white font-mono text-xl font-bold animate-pulse drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]">J-{timeLeft}</span>
         <span className="text-[10px] text-white/60 font-black uppercase tracking-widest italic opacity-80">Avant le BAC</span>

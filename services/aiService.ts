@@ -19,8 +19,12 @@ export const aiService = {
       : "Aucun document n'est chargé pour le moment.";
     
     const customMemory = storageService.getIAMemory();
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const timeStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
     
     return `Tu es Polaris Brain, l'assistant intelligent unique de SuccessPolaris.
+DATE ET HEURE ACTUELLE : Nous sommes le ${dateStr}, et il est ${timeStr}.
 TON IDENTITÉ ET MÉMOIRE : ${customMemory}
 TON OBJECTIF : Expliquer les cours et aider pour le BAC 2025.
 

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { storageService } from '../services/storageService.ts';
 import { Category, Document, VisitorActivity, AdminAccount } from '../types.ts';
 import AdminStats from './AdminStats.tsx';
@@ -40,6 +40,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
     setAIStats(storageService.getAIStats());
     setIaMemory(storageService.getIAMemory());
   }, []);
+
+  const fastestAI = useMemo(() => {
+    if (aiStats.length === 0) return null;
+    return [...aiStats].sort((a, b) => a.avgTime - b.avgTime)[0];
+  }, [aiStats]);
 
   const handleSaveMemory = () => {
     storageService.saveIAMemory(iaMemory);
@@ -125,7 +130,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
                <h3 className="text-xl font-black text-white uppercase italic mb-6">Contrôle Polaris</h3>
                <p className="text-white/40 text-[10px] uppercase font-bold tracking-[0.3em] mb-8 leading-loose">
                  Statut : <span className="text-emerald-400">Canal A (Compteur) Actif</span><br/>
-                 Statut : <span className="text-amber-400">Documents déconnectés de Sheets</span>
+                 Statut : <span className="text-amber-400">Accès Maître Autorisé</span>
                </p>
                <div className="flex gap-4">
                   <button onClick={handleManualSync} disabled={isSyncing} className="w-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest">{isSyncing ? 'Sync Compteur...' : 'Rafraîchir Compteur'}</button>
@@ -142,27 +147,33 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
                 <div className="bg-slate-900/40 p-8 rounded-[2rem] border border-white/10">
                    <h4 className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mb-6 italic">Performance des Modèles</h4>
                    <div className="space-y-4">
-                      {aiStats.map((stat, idx) => (
-                        <div key={stat.name} className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5">
-                           <div>
-                              <p className="text-white font-black text-[12px] uppercase">
-                                 {idx === 0 && '🥇 '}{idx === 1 && '🥈 '}{stat.name}
-                              </p>
-                              <p className="text-[8px] text-white/30 uppercase font-black">{stat.count} RÉPONSES</p>
-                           </div>
-                           <div className="text-right">
-                              <p className="text-cyan-400 font-mono font-bold">{stat.avgTime}ms</p>
-                              <p className="text-[7px] text-white/20 uppercase font-black tracking-widest">RÉFLEXION</p>
-                           </div>
-                        </div>
-                      ))}
-                      {aiStats.length === 0 && <p className="text-[9px] text-white/20 text-center py-4">AUCUNE DONNÉE IA DISPONIBLE</p>}
+                      {aiStats.map((stat, idx) => {
+                        const isFastest = fastestAI?.name === stat.name;
+                        return (
+                          <div key={stat.name} className={`flex items-center justify-between p-4 bg-white/5 rounded-xl border transition-all ${isFastest ? 'border-cyan-400 shadow-[0_0_15px_rgba(0,212,255,0.2)]' : 'border-white/5'}`}>
+                             <div className="flex items-center gap-3">
+                                <div>
+                                   <p className="text-white font-black text-[12px] uppercase flex items-center gap-2">
+                                      {stat.name}
+                                      {isFastest && <span className="text-[7px] bg-cyan-500 text-black px-2 py-0.5 rounded-full font-black animate-pulse">ALPHA_SPEED</span>}
+                                   </p>
+                                   <p className="text-[8px] text-white/30 uppercase font-black">{stat.count} RÉPONSES GÉNÉRÉES</p>
+                                </div>
+                             </div>
+                             <div className="text-right">
+                                <p className={`font-mono font-bold ${isFastest ? 'text-cyan-400 text-lg' : 'text-white/60'}`}>{stat.avgTime}ms</p>
+                                <p className="text-[7px] text-white/20 uppercase font-black tracking-widest">LATENCE MOYENNE</p>
+                             </div>
+                          </div>
+                        );
+                      })}
+                      {aiStats.length === 0 && <p className="text-[9px] text-white/20 text-center py-4 uppercase font-black tracking-widest">Initialisation des statistiques IA...</p>}
                    </div>
                 </div>
 
                 <div className="bg-slate-900/40 p-8 rounded-[2rem] border border-white/10 flex flex-col">
-                   <h4 className="text-[10px] font-black text-white uppercase tracking-widest mb-6 italic">Souvenirs du Nexus</h4>
-                   <p className="text-[8px] text-white/30 uppercase font-black mb-4">Directives permanentes du subconscient IA :</p>
+                   <h4 className="text-[10px] font-black text-white uppercase tracking-widest mb-6 italic">Injection de Mémoire</h4>
+                   <p className="text-[8px] text-white/30 uppercase font-black mb-4">Modifiez le subconscient des assistants Polaris :</p>
                    <textarea 
                      value={iaMemory} 
                      onChange={(e) => setIaMemory(e.target.value)}
@@ -171,9 +182,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ categories, documents, 
                    ></textarea>
                    <button 
                      onClick={handleSaveMemory}
-                     className="mt-6 bg-cyan-500 text-slate-950 py-4 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-neon"
+                     className="mt-6 bg-cyan-500 text-slate-950 py-4 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-neon hover:scale-105 active:scale-95 transition-all"
                    >
-                     Synchroniser la Mémoire
+                     Mettre à jour la Mémoire
                    </button>
                 </div>
              </div>

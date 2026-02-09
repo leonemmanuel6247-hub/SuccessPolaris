@@ -24,7 +24,6 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
     if (isOpen) scrollToBottom();
   }, [messages, isTyping, isOpen]);
 
-  // Fonction simple pour rendre le texte formaté (gras, italique, etc.)
   const renderFormattedText = (text: string) => {
     let formatted = text
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
@@ -90,7 +89,7 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
       </div>
 
       {isOpen && (
-        <div className="fixed bottom-0 right-0 w-full sm:bottom-6 sm:right-6 sm:w-[380px] h-full sm:h-[550px] max-h-[100vh] sm:max-h-[85vh] z-[8000] bg-slate-950 sm:bg-slate-950/90 backdrop-blur-3xl border-t sm:border border-white/10 sm:rounded-[2.5rem] shadow-[0_20px_60px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden animate-in slide-in-from-bottom-20 duration-500">
+        <div className="fixed bottom-0 right-0 w-full sm:bottom-6 sm:right-6 sm:w-[380px] h-[100dvh] sm:h-[550px] max-h-[100dvh] sm:max-h-[85vh] z-[8000] bg-slate-950 sm:bg-slate-950/90 backdrop-blur-3xl border-t sm:border border-white/10 sm:rounded-[2.5rem] shadow-[0_20px_60px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden animate-in slide-in-from-bottom-20 duration-500">
           
           <div className="bg-slate-900/50 p-6 border-b border-white/5 flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -107,7 +106,7 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar">
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 scroll-smooth custom-scrollbar">
             {messages.length === 0 && (
               <div className="h-full flex flex-col items-center justify-center text-center space-y-4 px-4">
                 <p className="text-[11px] text-white/50 font-medium leading-relaxed">
@@ -117,8 +116,8 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
             )}
 
             {messages.map((msg, idx) => (
-              <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                <div className={`max-w-[90%] p-4 rounded-[1.5rem] text-[12px] leading-relaxed shadow-lg ${
+              <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-2`}>
+                <div className={`max-w-[90%] p-4 rounded-[1.5rem] text-[12px] leading-relaxed shadow-lg break-words ${
                   msg.role === 'user' 
                   ? 'bg-cyan-500 text-slate-950 font-bold rounded-tr-none' 
                   : 'bg-white/5 border border-white/10 text-white/90 rounded-tl-none'
@@ -162,6 +161,12 @@ const PolarisBrain: React.FC<PolarisBrainProps> = ({ count, documents, categorie
           </form>
         </div>
       )}
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(0, 212, 255, 0.1); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(0, 212, 255, 0.3); }
+      `}</style>
     </>
   );
 };
