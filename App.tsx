@@ -1,11 +1,9 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import AuroraBackground from './components/AuroraBackground.tsx';
 import DocumentCard from './components/DocumentCard.tsx';
 import AdminDashboard from './components/AdminDashboard.tsx';
 import PDFViewer from './components/PDFViewer.tsx';
 import ExamCountdown from './components/ExamCountdown.tsx';
-import ChatWidget from './components/ChatWidget.tsx';
 import { storageService } from './services/storageService.ts';
 import { Category, Document, AdminAccount } from './types.ts';
 
@@ -42,7 +40,7 @@ const App: React.FC = () => {
         setTotalCount(externalCount);
       }
     } catch (err) { 
-      console.error("Nexus Sync Error:", err); 
+      console.error("Sync Error:", err); 
     } 
     finally { 
       setIsSyncing(false); 
@@ -70,7 +68,7 @@ const App: React.FC = () => {
   };
 
   const processFullAccess = (email: string, doc: Document) => {
-    if (storageService.isEmailBanned(email)) return alert("Accès Révoqué par le Protocole.");
+    if (storageService.isEmailBanned(email)) return alert("Accès Révoqué.");
     storageService.logDownload(email, doc.title, doc.id);
     storageService.incrementDownload(doc.id);
     setUserXP(storageService.addXP(25));
@@ -115,9 +113,6 @@ const App: React.FC = () => {
     <div className="min-h-screen text-slate-200 selection:bg-cyan-500/30">
       <AuroraBackground />
       <ExamCountdown onAdminAccess={() => setShowAdminLogin(true)} />
-      
-      {/* AI NEXUS WIDGET */}
-      {!isAdminMode && <ChatWidget documents={documents} />}
       
       {viewerDoc && <PDFViewer doc={viewerDoc} onClose={() => setViewerDoc(null)} />}
 
@@ -171,7 +166,7 @@ const App: React.FC = () => {
                    <i className="fas fa-arrow-left"></i> Quitter la Matrice
                 </button>
                 <div className="flex items-center gap-2 text-white/20 text-[8px] font-black uppercase tracking-widest italic">
-                  Connecté au Terminal Maître
+                  Terminal Maître
                 </div>
              </div>
              <AdminDashboard categories={categories} documents={documents} currentAdmin={currentAdmin} onRefresh={syncDocs} />
@@ -207,7 +202,7 @@ const App: React.FC = () => {
                 ) : (
                   <div className="col-span-full py-20 text-center">
                      <i className="fas fa-satellite-dish text-white/10 text-4xl mb-6"></i>
-                     <p className="text-[10px] text-white/30 uppercase font-black tracking-widest">Aucune donnée détectée dans ce secteur</p>
+                     <p className="text-[10px] text-white/30 uppercase font-black tracking-widest">Aucune donnée</p>
                   </div>
                 )}
               </div>
@@ -229,10 +224,10 @@ const App: React.FC = () => {
         <div className="fixed inset-0 z-[9000] flex items-center justify-center bg-black/95 p-6">
           <div className="max-w-md w-full p-12 bg-white/5 border border-cyan-500/20 rounded-[3rem] text-center shadow-2xl backdrop-blur-3xl">
             <h3 className="text-xl font-black text-white uppercase italic mb-4">Initialisation du Canal</h3>
-            <p className="text-[10px] text-cyan-100/40 uppercase font-black mb-10 leading-relaxed">Confirmez votre identité pour synchroniser l'archive Polaris.</p>
+            <p className="text-[10px] text-cyan-100/40 uppercase font-black mb-10 leading-relaxed">Confirmez votre identité.</p>
             <form onSubmit={handleIdentityConfirm} className="space-y-6">
-              <input type="email" required placeholder="votre-id@nexus.com" value={userEmail} onChange={e => setUserEmail(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-2xl px-8 py-5 text-white text-center font-bold outline-none focus:border-cyan-400" />
-              <button type="submit" className="w-full bg-cyan-500 text-black font-black py-5 rounded-2xl uppercase text-[11px] tracking-widest shadow-lg shadow-cyan-500/20 hover:bg-cyan-400 transition-all">Débloquer le Flux</button>
+              <input type="email" required placeholder="votre-id@polaris.com" value={userEmail} onChange={e => setUserEmail(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-2xl px-8 py-5 text-white text-center font-bold outline-none focus:border-cyan-400" />
+              <button type="submit" className="w-full bg-cyan-500 text-black font-black py-5 rounded-2xl uppercase text-[11px] tracking-widest shadow-lg shadow-cyan-500/20 hover:bg-cyan-400 transition-all">Accéder</button>
             </form>
           </div>
         </div>
@@ -245,7 +240,7 @@ const App: React.FC = () => {
             <div className="w-20 h-20 bg-cyan-500/10 border border-cyan-500/20 rounded-3xl flex items-center justify-center mx-auto mb-10">
                <i className="fas fa-key text-cyan-400 text-3xl"></i>
             </div>
-            <h3 className="text-lg font-black text-cyan-400 uppercase italic tracking-widest mb-10">Authentification Matrice</h3>
+            <h3 className="text-lg font-black text-cyan-400 uppercase italic tracking-widest mb-10">Authentification</h3>
             <form onSubmit={(e) => { 
               e.preventDefault(); 
               if(secretCode === 'mazedxn7') {
@@ -259,15 +254,14 @@ const App: React.FC = () => {
             }} className="space-y-6">
               <input 
                 type="password" 
-                placeholder="Entrez le code secret..." 
+                placeholder="Code secret..." 
                 value={secretCode} 
                 onChange={e => setSecretCode(e.target.value)} 
                 className="w-full bg-black/40 border border-white/10 rounded-2xl px-8 py-5 text-white text-center font-black outline-none focus:border-cyan-400 transition-all" 
                 autoComplete="off" 
-                autoFocus
               />
               {loginError && <p className="text-red-500 text-[10px] font-black uppercase animate-pulse">Code Invalide</p>}
-              <button type="submit" className="w-full bg-cyan-500 text-black font-black py-5 rounded-2xl uppercase tracking-[0.2em] shadow-lg shadow-cyan-500/20 hover:bg-cyan-400 active:scale-95 transition-all">S'authentifier</button>
+              <button type="submit" className="w-full bg-cyan-500 text-black font-black py-5 rounded-2xl uppercase tracking-[0.2em] shadow-lg shadow-cyan-500/20 hover:bg-cyan-400 transition-all">S'authentifier</button>
             </form>
           </div>
         </div>

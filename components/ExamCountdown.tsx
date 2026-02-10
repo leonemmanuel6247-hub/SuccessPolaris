@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 
 interface ExamCountdownProps {
@@ -23,7 +22,8 @@ const ExamCountdown: React.FC<ExamCountdownProps> = ({ onAdminAccess }) => {
   return (
     <div 
       onClick={onAdminAccess}
-      className="fixed top-0 left-1/2 -translate-x-1/2 z-[100] bg-black/40 backdrop-blur-md px-8 py-4 rounded-b-3xl border-x border-b border-white/10 shadow-[0_10px_30px_rgba(255,255,255,0.05)] cursor-default active:bg-cyan-500/5 transition-colors"
+      className="fixed top-0 left-1/2 -translate-x-1/2 z-[100] bg-black/40 backdrop-blur-md px-8 py-4 rounded-b-3xl border-x border-b border-white/10 shadow-[0_10px_30px_rgba(255,255,255,0.05)] cursor-pointer active:bg-cyan-500/5 transition-colors"
+      title="Statut Archive Temporelle"
     >
       <div className="flex items-center gap-3">
         <span className="text-white font-mono text-xl font-bold animate-pulse drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]">J-{timeLeft}</span>

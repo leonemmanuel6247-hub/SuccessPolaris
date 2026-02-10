@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SuccessPolaris - Nexus Néon</title>
+    <title>SuccessPolaris - Astral Palace</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -80,58 +79,12 @@
         @keyframes rotate-linear { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes rotate-reverse { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
     </style>
-    <script>
-      // Bloquer les assistants AI externes et sécuriser les entrées
-      if (typeof window !== 'undefined') {
-        // Désactiver les suggestions automatiques et correcteurs sur tous les champs
-        const secureAllInputs = () => {
-          const inputs = document.querySelectorAll('input, textarea, [contenteditable]');
-          inputs.forEach(input => {
-            input.setAttribute('autocomplete', 'off');
-            input.setAttribute('autocorrect', 'off');
-            input.setAttribute('autocapitalize', 'off');
-            input.setAttribute('spellcheck', 'false');
-            input.setAttribute('data-gramm', 'false');
-            input.setAttribute('data-enable-grammarly', 'false');
-          });
-        };
-
-        document.addEventListener('DOMContentLoaded', secureAllInputs);
-        
-        // Détecter et bloquer les overlays de Gemini / Google AI Studio
-        const observer = new MutationObserver((mutations) => {
-          mutations.forEach((mutation) => {
-            if (mutation.addedNodes.length) {
-              mutation.addedNodes.forEach((node) => {
-                if (node.nodeType === 1) {
-                  const el = node;
-                  if (el.classList && (
-                    el.classList.contains('gemini') ||
-                    el.classList.contains('google-ai') ||
-                    (el.id && (el.id.includes('google') || el.id.includes('gemini')))
-                  )) {
-                    el.remove();
-                  }
-                }
-              });
-            }
-          });
-        });
-        
-        observer.observe(document.body, { childList: true, subtree: true });
-        
-        // Répéter la sécurisation lors des mutations DOM
-        const inputObserver = new MutationObserver(secureAllInputs);
-        inputObserver.observe(document.body, { childList: true, subtree: true });
-      }
-    </script>
     <script type="importmap">
     {
       "imports": {
         "react": "https://esm.sh/react@19.0.0",
         "react-dom": "https://esm.sh/react-dom@19.0.0",
         "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
-        "@google/genai": "https://esm.sh/@google/genai@^1.35.0",
         "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
         "react/": "https://esm.sh/react@^19.2.4/"
       }
@@ -148,7 +101,6 @@
             <div class="stellar-core"></div>
         </div>
         <div class="loader-title">SUCCESS POLARIS</div>
-        <div style="font-size: 8px; color: #00d4ff; margin-top: 1.5rem; letter-spacing: 0.5em; font-weight: 800; text-transform: uppercase; opacity: 0.4;">Nexus Isolé & Sécurisé</div>
     </div>
     <div id="root"></div>
 </body>
