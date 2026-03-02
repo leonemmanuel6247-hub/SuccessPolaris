@@ -1,3 +1,4 @@
+
 export interface Category {
   id: string;
   name: string;
@@ -44,4 +45,10 @@ export interface UserProfile {
   xp: number;
   email: string;
   level: string;
+}
+
+export interface ChatMessage {
+  role: 'model' | 'user';
+  text: string;
+  timestamp: string;
 }

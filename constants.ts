@@ -5,9 +5,11 @@ export const THEME = {
   deepSpace: '#020617', // Bleu nuit très profond
   nexusCyan: '#00d4ff', // Cyan électrique
   electricBlue: '#3b82f6', // Bleu vibrant
+  polarisNeon: '#0ff0fc', // Néon bleu Polaris
   matrixGlow: 'rgba(0, 212, 255, 0.15)',
   warmGlass: 'rgba(255, 255, 255, 0.03)',
-  vibrantGlow: 'rgba(0, 212, 255, 0.3)'
+  vibrantGlow: 'rgba(0, 212, 255, 0.3)',
+  spaceBlack: '#0a0a2a'
 };
 
 export const URL_COMPTEUR = 'https://script.google.com/macros/s/AKfycbCiCf6TonxpoZ7RjacHCEIg6hl0D0ImulJvqsbkF1jMhEA_U5nWTfrdWbl5sWQdT3B/exec';

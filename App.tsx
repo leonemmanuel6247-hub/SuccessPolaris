@@ -1,9 +1,12 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import AuroraBackground from './components/AuroraBackground.tsx';
 import DocumentCard from './components/DocumentCard.tsx';
 import AdminDashboard from './components/AdminDashboard.tsx';
 import PDFViewer from './components/PDFViewer.tsx';
 import ExamCountdown from './components/ExamCountdown.tsx';
+import ChatWidget from './components/ChatWidget.tsx';
+import PolarisBrain from './components/PolarisBrain.tsx';
 import { storageService } from './services/storageService.ts';
 import { Category, Document, AdminAccount } from './types.ts';
 
@@ -14,6 +17,7 @@ const App: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [navigationPath, setNavigationPath] = useState<Category[]>([]);
   const [isAdminMode, setIsAdminMode] = useState(false);
+  const [showBrain, setShowBrain] = useState(false);
   const [currentAdmin, setCurrentAdmin] = useState<AdminAccount | null>(null);
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [secretCode, setSecretCode] = useState('');
@@ -21,11 +25,10 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(true);
   const [viewMode, setViewMode] = useState<'archives' | 'library'>('archives');
 
-  const [userXP, setUserXP] = useState(0);
-  const [showEmailModal, setShowEmailModal] = useState(false);
-  const [pendingDoc, setPendingDoc] = useState<Document | null>(null);
   const [viewerDoc, setViewerDoc] = useState<Document | null>(null);
   const [userEmail, setUserEmail] = useState('');
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [pendingDoc, setPendingDoc] = useState<Document | null>(null);
 
   const syncDocs = async () => {
     setIsSyncing(true);
@@ -50,7 +53,6 @@ const App: React.FC = () => {
   useEffect(() => {
     syncDocs();
     storageService.logVisit(); 
-    setUserXP(storageService.getUserXP());
     const savedEmail = storageService.getUserEmail();
     if (savedEmail) setUserEmail(savedEmail);
   }, []);
@@ -71,7 +73,6 @@ const App: React.FC = () => {
     if (storageService.isEmailBanned(email)) return alert("Accès Révoqué.");
     storageService.logDownload(email, doc.title, doc.id);
     storageService.incrementDownload(doc.id);
-    setUserXP(storageService.addXP(25));
     setViewerDoc(doc);
   };
 
@@ -114,6 +115,9 @@ const App: React.FC = () => {
       <AuroraBackground />
       <ExamCountdown onAdminAccess={() => setShowAdminLogin(true)} />
       
+      {!isAdminMode && <ChatWidget documents={documents} />}
+      {showBrain && <PolarisBrain documents={documents} onClose={() => setShowBrain(false)} />}
+
       {viewerDoc && <PDFViewer doc={viewerDoc} onClose={() => setViewerDoc(null)} />}
 
       <header className="container mx-auto px-6 py-16 flex flex-col items-center gap-12 relative z-50">
@@ -129,7 +133,16 @@ const App: React.FC = () => {
                   </h1>
                </div>
 
-               <div className="flex items-center gap-4">
+               <div className="flex items-center gap-6">
+                  {/* Bouton Polaris Brain */}
+                  <button 
+                    onClick={() => setShowBrain(true)}
+                    className="flex items-center gap-3 px-6 py-4 bg-[#0ff0fc]/10 border border-[#0ff0fc]/30 rounded-2xl text-[#0ff0fc] font-black uppercase text-[10px] tracking-widest hover:bg-[#0ff0fc] hover:text-black transition-all shadow-[0_0_20px_rgba(0,240,252,0.2)]"
+                  >
+                    <i className="fas fa-brain animate-pulse"></i>
+                    Nexus Brain
+                  </button>
+
                   <div className="bg-white/5 backdrop-blur-2xl border border-white/10 p-4 rounded-[1.5rem] flex items-center gap-4 shadow-xl">
                      <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center border border-cyan-500/20">
                         <i className="fas fa-database text-cyan-400 text-sm"></i>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SuccessPolaris - Astral Palace</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #020617;
+            color: #e2e8f0;
+            margin: 0;
+            overflow-x: hidden;
+        }
+        #root { min-height: 100vh; position: relative; z-index: 10; }
+        
+        #loader {
+            position: fixed;
+            inset: 0;
+            background: #000;
+            z-index: 99999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .stellar-phenomenon {
+            position: relative;
+            width: 250px;
+            height: 250px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .stellar-core {
+            width: 60px;
+            height: 60px;
+            background: #00d4ff;
+            border-radius: 50%;
+            box-shadow: 
+                0 0 30px #00d4ff,
+                0 0 60px rgba(0, 212, 255, 0.5),
+                inset 0 0 15px #fff;
+            animation: core-pulse 1.5s ease-in-out infinite;
+            z-index: 10;
+        }
+
+        .stellar-ring {
+            position: absolute;
+            border-radius: 50%;
+            border: 1px solid rgba(0, 212, 255, 0.2);
+        }
+
+        .ring-1 { width: 120px; height: 120px; animation: rotate-linear 4s linear infinite; border-top-color: #00d4ff; }
+        .ring-2 { width: 180px; height: 180px; animation: rotate-reverse 8s linear infinite; border-right-color: #3b82f6; }
+        .ring-3 { width: 240px; height: 240px; animation: rotate-linear 12s linear infinite; border-bottom-color: #00d4ff; border-style: dashed; }
+
+        .loader-title {
+            margin-top: 4rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 1.5em;
+            color: #fff;
+            font-size: 18px;
+            text-shadow: 0 0 20px #00d4ff;
+        }
+
+        @keyframes core-pulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 30px #00d4ff; }
+            50% { transform: scale(1.1); box-shadow: 0 0 50px #00d4ff; }
+        }
+        @keyframes rotate-linear { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes rotate-reverse { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
+    </style>
+    <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@19.0.0",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.40.0"
+  }
+}
+</script>
+    <script type="module" src="index.tsx"></script>
+</head>
+<body>
+    <div id="loader">
+        <div class="stellar-phenomenon">
+            <div class="stellar-ring ring-1"></div>
+            <div class="stellar-ring ring-2"></div>
+            <div class="stellar-ring ring-3"></div>
+            <div class="stellar-core"></div>
+        </div>
+        <div class="loader-title">SUCCESS POLARIS</div>
+    </div>
+    <div id="root"></div>
+</body>
+</html>
