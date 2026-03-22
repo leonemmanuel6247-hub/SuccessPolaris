@@ -19,8 +19,8 @@ export const aiService = {
     // Construction du contexte des documents pour l'IA
     const docsContext = availableDocs.map(d => `- ${d.title} [${d.categoryId}]`).join('\n');
 
-    const systemInstruction = `Tu es Polaris Brain, un système d'IA expert en éducation supérieure, créé par Astarté Léon.
-Tes réponses doivent être précises, académiques mais accessibles, et imprégnées de l'autorité du Nexus Polaris.
+    const systemInstruction = `Tu es Astarté, un système d'IA intelligent et polyvalent.
+Tes réponses doivent être précises, utiles et accessibles.
 Tu as accès aux archives suivantes sur le site :
 ${docsContext}
 
@@ -43,8 +43,8 @@ Réponds toujours en français. Sois rapide et efficace.`;
       const responseTime = Date.now() - startTime;
       
       return {
-        text: response.text || "Désolé, le Nexus est actuellement saturé.",
-        source: "Gemini 3 Flash (Polaris Engine)",
+        text: response.text || "Désolé, Astarté est actuellement saturée.",
+        source: "Gemini 3 Flash (Astarté Engine)",
         status: "ACTIF",
         responseTime: responseTime
       };

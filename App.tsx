@@ -6,7 +6,6 @@ import AdminDashboard from './components/AdminDashboard.tsx';
 import PDFViewer from './components/PDFViewer.tsx';
 import ExamCountdown from './components/ExamCountdown.tsx';
 import ChatWidget from './components/ChatWidget.tsx';
-import PolarisBrain from './components/PolarisBrain.tsx';
 import { storageService } from './services/storageService.ts';
 import { Category, Document, AdminAccount } from './types.ts';
 
@@ -17,7 +16,6 @@ const App: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [navigationPath, setNavigationPath] = useState<Category[]>([]);
   const [isAdminMode, setIsAdminMode] = useState(false);
-  const [showBrain, setShowBrain] = useState(false);
   const [currentAdmin, setCurrentAdmin] = useState<AdminAccount | null>(null);
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [secretCode, setSecretCode] = useState('');
@@ -116,7 +114,6 @@ const App: React.FC = () => {
       <ExamCountdown onAdminAccess={() => setShowAdminLogin(true)} />
       
       {!isAdminMode && <ChatWidget documents={documents} />}
-      {showBrain && <PolarisBrain documents={documents} onClose={() => setShowBrain(false)} />}
 
       {viewerDoc && <PDFViewer doc={viewerDoc} onClose={() => setViewerDoc(null)} />}
 
@@ -134,16 +131,7 @@ const App: React.FC = () => {
                </div>
 
                <div className="flex items-center gap-6">
-                  {/* Bouton Polaris Brain */}
-                  <button 
-                    onClick={() => setShowBrain(true)}
-                    className="flex items-center gap-3 px-6 py-4 bg-[#0ff0fc]/10 border border-[#0ff0fc]/30 rounded-2xl text-[#0ff0fc] font-black uppercase text-[10px] tracking-widest hover:bg-[#0ff0fc] hover:text-black transition-all shadow-[0_0_20px_rgba(0,240,252,0.2)]"
-                  >
-                    <i className="fas fa-brain animate-pulse"></i>
-                    Nexus Brain
-                  </button>
-
-                  <div className="bg-white/5 backdrop-blur-2xl border border-white/10 p-4 rounded-[1.5rem] flex items-center gap-4 shadow-xl">
+                   <div className="bg-white/5 backdrop-blur-2xl border border-white/10 p-4 rounded-[1.5rem] flex items-center gap-4 shadow-xl">
                      <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center border border-cyan-500/20">
                         <i className="fas fa-database text-cyan-400 text-sm"></i>
                      </div>
@@ -160,7 +148,7 @@ const App: React.FC = () => {
                   <i className="fas fa-search text-cyan-400/30 ml-6"></i>
                   <input 
                     type="text" 
-                    placeholder="Scanner les archives du savoir..." 
+                    placeholder="Explorer avec Astarté..." 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="flex-1 bg-transparent px-5 py-4 text-[14px] outline-none font-medium text-white placeholder-white/20" 
@@ -237,9 +225,9 @@ const App: React.FC = () => {
         <div className="fixed inset-0 z-[9000] flex items-center justify-center bg-black/95 p-6">
           <div className="max-w-md w-full p-12 bg-white/5 border border-cyan-500/20 rounded-[3rem] text-center shadow-2xl backdrop-blur-3xl">
             <h3 className="text-xl font-black text-white uppercase italic mb-4">Initialisation du Canal</h3>
-            <p className="text-[10px] text-cyan-100/40 uppercase font-black mb-10 leading-relaxed">Confirmez votre identité.</p>
+            <p className="text-[10px] text-cyan-100/40 uppercase font-black mb-10 leading-relaxed">Confirmez votre identité pour accéder à Astarté.</p>
             <form onSubmit={handleIdentityConfirm} className="space-y-6">
-              <input type="email" required placeholder="votre-id@polaris.com" value={userEmail} onChange={e => setUserEmail(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-2xl px-8 py-5 text-white text-center font-bold outline-none focus:border-cyan-400" />
+              <input type="email" required placeholder="votre-id@astarte.com" value={userEmail} onChange={e => setUserEmail(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-2xl px-8 py-5 text-white text-center font-bold outline-none focus:border-cyan-400" />
               <button type="submit" className="w-full bg-cyan-500 text-black font-black py-5 rounded-2xl uppercase text-[11px] tracking-widest shadow-lg shadow-cyan-500/20 hover:bg-cyan-400 transition-all">Accéder</button>
             </form>
           </div>

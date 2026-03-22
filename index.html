@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SuccessPolaris - Astral Palace</title>
+    <meta name="description" content="SuccessPolaris - Votre assistant intelligent personnel.">
+    <meta property="og:title" content="SuccessPolaris - Astral Palace">
+    <meta property="og:description" content="Explorez avec Astarté, l'assistant Polaris.">
+    <meta property="og:type" content="website">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💠</text></svg>">
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -15,6 +20,10 @@
             color: #e2e8f0;
             margin: 0;
             overflow-x: hidden;
+            text-shadow: 0 0 8px rgba(0, 212, 255, 0.3);
+        }
+        h1, h2, h3, .text-cyan-400, .text-[#0ff0fc] {
+            text-shadow: 0 0 12px rgba(0, 212, 255, 0.6), 0 0 2px rgba(0, 212, 255, 0.8);
         }
         #root { min-height: 100vh; position: relative; z-index: 10; }
         
@@ -92,6 +101,7 @@
 }
 </script>
     <script type="module" src="index.tsx"></script>
+<link rel="stylesheet" href="/index.css">
 </head>
 <body>
     <div id="loader">
@@ -104,5 +114,6 @@
         <div class="loader-title">SUCCESS POLARIS</div>
     </div>
     <div id="root"></div>
+<script type="module" src="/index.tsx"></script>
 </body>
 </html>

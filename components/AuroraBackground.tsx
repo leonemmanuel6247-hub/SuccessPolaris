@@ -1,41 +1,127 @@
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 
 const AuroraBackground: React.FC = () => {
-  return (
-    <div className="fixed inset-0 z-[-1] overflow-hidden bg-[#020617]">
-      {/* Couches de nébuleuses fluides */}
-      <div className="absolute inset-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[70%] h-[70%] bg-cyan-600/10 blur-[120px] rounded-full animate-flow-1"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-blue-600/10 blur-[120px] rounded-full animate-flow-2"></div>
-        <div className="absolute top-[20%] right-[10%] w-[40%] h-[40%] bg-indigo-600/5 blur-[100px] rounded-full animate-flow-3"></div>
-      </div>
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-      {/* Grain de film subtil pour texture */}
-      <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animationFrameId: number;
+    let stars: Star[] = [];
+    const starCount = 2000; // Milliers d'étoiles
+    const connectionDistance = 120;
+
+    class Star {
+      x: number;
+      y: number;
+      size: number;
+      speedX: number;
+      speedY: number;
+      opacity: number;
+
+      constructor(w: number, h: number) {
+        this.x = Math.random() * w;
+        this.y = Math.random() * h;
+        this.size = Math.random() * 1.8;
+        this.speedX = (Math.random() - 0.5) * 0.15;
+        this.speedY = (Math.random() - 0.5) * 0.15;
+        this.opacity = Math.random() * 0.8 + 0.2;
+      }
+
+      update(w: number, h: number) {
+        this.x += this.speedX;
+        this.y += this.speedY;
+
+        if (this.x < 0) this.x = w;
+        if (this.x > w) this.x = 0;
+        if (this.y < 0) this.y = h;
+        if (this.y > h) this.y = 0;
+      }
+
+      draw(context: CanvasRenderingContext2D) {
+        context.fillStyle = `rgba(255, 255, 255, ${this.opacity})`;
+        context.beginPath();
+        context.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        context.fill();
+      }
+    }
+
+    const init = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      canvas.width = w;
+      canvas.height = h;
+      stars = [];
+      for (let i = 0; i < starCount; i++) {
+        stars.push(new Star(w, h));
+      }
+    };
+
+    const drawConstellations = () => {
+      if (!ctx) return;
+      ctx.strokeStyle = 'rgba(0, 212, 255, 0.08)';
+      ctx.lineWidth = 0.4;
+
+      // Draw constellations by connecting groups of stars
+      for (let i = 0; i < stars.length; i += 20) { 
+        for (let j = i + 1; j < i + 6; j++) {
+          if (j >= stars.length) break;
+          const s1 = stars[i];
+          const s2 = stars[j];
+          const dist = Math.sqrt((s1.x - s2.x) ** 2 + (s1.y - s2.y) ** 2);
+
+          if (dist < connectionDistance) {
+            ctx.beginPath();
+            ctx.moveTo(s1.x, s1.y);
+            ctx.lineTo(s2.x, s2.y);
+            ctx.stroke();
+          }
+        }
+      }
+    };
+
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       
-      {/* Vignettage pour focus central */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(2,6,23,0.8)_100%)]"></div>
+      // Fond dégradé profond
+      const gradient = ctx.createRadialGradient(
+        canvas.width / 2, canvas.height / 2, 0,
+        canvas.width / 2, canvas.height / 2, canvas.width
+      );
+      gradient.addColorStop(0, '#020617');
+      gradient.addColorStop(1, '#000000');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      <style>{`
-        @keyframes flow-1 {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          33% { transform: translate(10%, 10%) scale(1.1); }
-          66% { transform: translate(-5%, 15%) scale(0.9); }
-        }
-        @keyframes flow-2 {
-          0%, 100% { transform: translate(0, 0) scale(1.1); }
-          33% { transform: translate(-15%, -10%) scale(0.9); }
-          66% { transform: translate(10%, -5%) scale(1); }
-        }
-        @keyframes flow-3 {
-          0%, 100% { transform: translate(0, 0) opacity: 0.3; }
-          50% { transform: translate(5%, -15%) opacity: 0.6; }
-        }
-        .animate-flow-1 { animation: flow-1 20s ease-in-out infinite; }
-        .animate-flow-2 { animation: flow-2 25s ease-in-out infinite; }
-        .animate-flow-3 { animation: flow-3 15s ease-in-out infinite; }
-      `}</style>
+      stars.forEach(star => {
+        star.update(canvas.width, canvas.height);
+        star.draw(ctx);
+      });
+
+      drawConstellations();
+      animationFrameId = requestAnimationFrame(animate);
+    };
+
+    window.addEventListener('resize', init);
+    init();
+    animate();
+
+    return () => {
+      window.removeEventListener('resize', init);
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-[-1] overflow-hidden bg-black">
+      <canvas ref={canvasRef} className="w-full h-full" />
+      {/* Effet de brume cosmique */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(2,6,23,0.4)_100%)] pointer-events-none"></div>
     </div>
   );
 };
