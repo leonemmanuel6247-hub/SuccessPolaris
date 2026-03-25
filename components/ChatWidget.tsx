@@ -26,7 +26,7 @@ export default function ChatWidget({ documents }: ChatWidgetProps) {
 
       {/* Fenêtre de Chat */}
       {isOpen && (
-        <div className="fixed bottom-4 right-4 md:bottom-24 md:right-6 z-[4001] w-[calc(100vw-32px)] md:w-[400px] h-[calc(100vh-100px)] md:h-[600px] max-h-[85vh] bg-[#020617] border border-cyan-500/30 rounded-[2rem] md:rounded-[2.5rem] shadow-[0_0_50px_rgba(0,212,255,0.2)] flex flex-col overflow-hidden animate-in slide-in-from-bottom-5">
+        <div className="fixed bottom-4 right-4 md:bottom-24 md:right-6 z-[4001] w-[calc(100vw-32px)] md:w-[500px] h-[calc(100vh-80px)] md:h-[750px] max-h-[90vh] bg-[#020617] border border-cyan-500/30 rounded-[2rem] md:rounded-[2.5rem] shadow-[0_0_50px_rgba(0,212,255,0.2)] flex flex-col overflow-hidden animate-in slide-in-from-bottom-5">
           {/* Header */}
           <div className="bg-cyan-500 p-4 md:p-6 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -49,9 +49,9 @@ export default function ChatWidget({ documents }: ChatWidgetProps) {
               <i className="fas fa-circle-notch fa-spin text-cyan-500 text-4xl"></i>
             </div>
             <iframe 
-              src="https://www.stackai.com/chat/69bf07f4d6eabd15e91e0d64-0S0UCJiReYt23u3qA38Q79"
+              src="https://astarte18.pages.dev/"
               className="w-full h-full border-none relative z-10"
-              title="StackAI Chat"
+              title="Astarté AI"
               allow="clipboard-read; clipboard-write; microphone"
             />
           </div>
